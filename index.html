@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChiHealth MediSecure</title>
+  <script>
+    // Set theme on page load to prevent flashing
+    if (localStorage.getItem('theme') === 'light') {
+        document.documentElement.classList.remove('dark');
+    } else {
+        document.documentElement.classList.add('dark');
+    }
+  </script>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.24.0",
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
+    "vite": "https://aistudiocdn.com/vite@^7.1.11",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.4",
+    "express": "https://aistudiocdn.com/express@^5.1.0",
+    "cors": "https://aistudiocdn.com/cors@^2.8.5",
+    "@prisma/client": "https://aistudiocdn.com/@prisma/client@^6.17.1",
+    "process": "https://aistudiocdn.com/process@^0.11.10",
+    "body-parser": "https://aistudiocdn.com/body-parser@^2.2.0",
+    "bcrypt": "https://aistudiocdn.com/bcrypt@^6.0.0",
+    "ws": "https://aistudiocdn.com/ws@^8.17.0",
+    "url": "https://aistudiocdn.com/url@^0.11.4",
+    "jsonwebtoken": "https://aistudiocdn.com/jsonwebtoken@^9.0.2",
+    "http": "https://aistudiocdn.com/http@^0.0.1-security",
+    "@testing-library/jest-dom/": "https://aistudiocdn.com/@testing-library/jest-dom@^6.9.1/",
+    "@testing-library/react": "https://aistudiocdn.com/@testing-library/react@^16.3.0",
+    "vitest": "https://aistudiocdn.com/vitest@^3.2.4",
+    "vitest/": "https://aistudiocdn.com/vitest@^3.2.4/",
+    "@testing-library/user-event": "https://aistudiocdn.com/@testing-library/user-event@^14.6.1",
+    "@playwright/test": "https://aistudiocdn.com/@playwright/test@^1.56.1",
+    "bcryptjs": "https://aistudiocdn.com/bcryptjs@^3.0.2",
+    "express-validator": "https://aistudiocdn.com/express-validator@^7.2.1",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "passport-google-oauth20": "https://aistudiocdn.com/passport-google-oauth20@^2.0.0",
+    "passport": "https://aistudiocdn.com/passport@^0.7.0",
+    "cookie-parser": "https://aistudiocdn.com/cookie-parser@^1.4.7"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
