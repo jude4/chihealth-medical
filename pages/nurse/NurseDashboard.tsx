@@ -9,8 +9,9 @@ import { DashboardHeader } from '../../components/common/DashboardHeader.tsx';
 import { FullScreenLoader } from '../../components/common/FullScreenLoader.tsx';
 import { TriageQueueView } from './TriageQueueView.tsx';
 import { InpatientView } from './InpatientView.tsx';
+import { SettingsView } from '../common/SettingsView.tsx';
 
-type NurseView = 'triage' | 'inpatients';
+type NurseView = 'triage' | 'inpatients' | 'settings';
 
 interface NurseDashboardProps {
   user: User;
@@ -34,7 +35,7 @@ const Sidebar: React.FC<{ activeView: NurseView; setActiveView: (view: NurseView
     <aside className="sidebar">
       <button onClick={() => setActiveView('triage')} className="sidebar-logo-button"><Logo /><h1>ChiHealth Nursing</h1></button>
       <nav className="flex-1 space-y-1">{navItems.map(item => <NavLink key={item.id} item={item} />)}</nav>
-      <div><button onClick={() => {}} className={`sidebar-link`}><Icons.SettingsIcon /><span>Settings</span></button></div>
+      <div><button onClick={() => setActiveView('settings')} className={`sidebar-link ${activeView === 'settings' ? 'active' : ''}`}><Icons.SettingsIcon /><span>Settings</span></button></div>
     </aside>
   );
 };
@@ -74,12 +75,13 @@ const NurseDashboard: React.FC<NurseDashboardProps> = (props) => {
     switch (activeView) {
       case 'triage': return <TriageQueueView triageQueue={data.triageQueue} onSaveVitals={handleSaveVitals} />;
       case 'inpatients': return <InpatientView patients={data.inpatients} />;
+      case 'settings': return <SettingsView user={props.user} />;
       default: return <div>Triage Queue</div>;
     }
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader {...props} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Nurse Dashboard" />}>
+    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Nurse Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
       {renderContent()}
     </DashboardLayout>
   );

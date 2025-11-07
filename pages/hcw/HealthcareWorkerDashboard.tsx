@@ -17,8 +17,9 @@ import { MessagingView } from '../../components/common/MessagingView.tsx';
 import { TelemedicineView } from '../common/TelemedicineView.tsx';
 import { ClinicalNoteModal } from '../../components/hcw/ClinicalNoteModal.tsx';
 import { generateAiChannelResponse } from '../../services/geminiService.ts';
+import { SettingsView } from '../common/SettingsView.tsx';
 
-type HcwView = 'overview' | 'schedule' | 'patients' | 'ehr' | 'prescriptions' | 'labs' | 'messages' | 'telemedicine';
+type HcwView = 'overview' | 'schedule' | 'patients' | 'ehr' | 'prescriptions' | 'labs' | 'messages' | 'telemedicine' | 'settings';
 
 interface HealthcareWorkerDashboardProps {
   user: User;
@@ -46,7 +47,7 @@ const Sidebar: React.FC<{ activeView: HcwView; setActiveView: (view: HcwView) =>
     <aside className="sidebar">
       <button onClick={() => setActiveView('overview')} className="sidebar-logo-button"><Logo /><h1>ChiHealth</h1></button>
       <nav className="flex-1 space-y-1">{navItems.map(item => <NavLink key={item.id} item={item} />)}</nav>
-      <div><button onClick={() => {}} className={`sidebar-link`}><Icons.SettingsIcon /><span>Settings</span></button></div>
+      <div><button onClick={() => setActiveView('settings')} className={`sidebar-link ${activeView === 'settings' ? 'active' : ''}`}><Icons.SettingsIcon /><span>Settings</span></button></div>
     </aside>
   );
 };
@@ -131,12 +132,13 @@ const HealthcareWorkerDashboard: React.FC<HealthcareWorkerDashboardProps> = (pro
       case 'labs': return <LabRequestsView labTests={data.labTests} />;
       case 'messages': return <MessagingView messages={data.messages} currentUser={props.user} contacts={data.patients} onSendMessage={async (rec, content, patId) => { await api.sendMessage({recipientId: rec, content, patientId: patId, senderId: props.user.id}); fetchData(); }} onStartCall={(contact) => handleStartCall(contact.id)} onAiChannelCommand={handleAiCommand} />;
       case 'telemedicine': return selectedPatient ? <TelemedicineView onEndCall={handleEndCall} patientName={selectedPatient.name} doctorName={props.user.name} /> : <div>No call active.</div>
+      case 'settings': return <SettingsView user={props.user} />;
       default: return <div>Overview</div>;
     }
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader {...props} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Clinician Dashboard" />}>
+    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Clinician Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
       {renderContent()}
        {selectedPatient && <ClinicalNoteModal isOpen={isNoteModalOpen} onClose={() => setNoteModalOpen(false)} patient={selectedPatient} doctor={props.user} onSave={async (note) => { await api.createClinicalNote(note); addToast('Note from call saved.', 'success'); fetchData(); setNoteModalOpen(false); setNoteFromCall(''); }} initialContent={noteFromCall} />}
     </DashboardLayout>

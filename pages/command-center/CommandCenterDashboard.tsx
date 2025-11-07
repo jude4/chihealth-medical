@@ -10,6 +10,7 @@ import { FullScreenLoader } from '../../components/common/FullScreenLoader.tsx';
 import { Button } from '../../components/common/Button.tsx';
 import { AdmitPatientModal } from './AdmitPatientModal.tsx';
 import { DischargePatientModal } from './DischargePatientModal.tsx';
+import { SettingsView } from '../common/SettingsView.tsx';
 
 interface CommandCenterDashboardProps {
   user: User;
@@ -19,15 +20,15 @@ interface CommandCenterDashboardProps {
   toggleTheme: () => void;
 }
 
-const Sidebar: React.FC<{}> = () => {
+const Sidebar: React.FC<{ activeView: string; setActiveView: (view: string) => void }> = ({ activeView, setActiveView }) => {
   const navItems = [{ id: 'overview', label: 'Operations Overview', icon: Icons.LayoutDashboardIcon }];
   return (
     <aside className="sidebar">
-      <button className="sidebar-logo-button"><Logo /><h1>Command Center</h1></button>
+      <button onClick={() => setActiveView('overview')} className="sidebar-logo-button"><Logo /><h1>Command Center</h1></button>
       <nav className="flex-1 space-y-1">
-        {navItems.map(item => <button key={item.id} className="sidebar-link active"><item.icon /><span>{item.label}</span></button>)}
+        {navItems.map(item => <button key={item.id} onClick={() => setActiveView(item.id)} className={`sidebar-link ${activeView === item.id ? 'active' : ''}`}><item.icon /><span>{item.label}</span></button>)}
       </nav>
-      <div><button className="sidebar-link"><Icons.SettingsIcon /><span>Settings</span></button></div>
+      <div><button onClick={() => setActiveView('settings')} className={`sidebar-link ${activeView === 'settings' ? 'active' : ''}`}><Icons.SettingsIcon /><span>Settings</span></button></div>
     </aside>
   );
 };
@@ -99,6 +100,7 @@ const ActivityFeed: React.FC<{ logs: any[] }> = ({ logs }) => {
 };
 
 const CommandCenterDashboard: React.FC<CommandCenterDashboardProps> = (props) => {
+  const [activeView, setActiveView] = useState<'overview' | 'settings'>('overview');
   const [data, setData] = useState<CommandCenterData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmitModalOpen, setAdmitModalOpen] = useState(false);
@@ -149,6 +151,10 @@ const CommandCenterDashboard: React.FC<CommandCenterDashboardProps> = (props) =>
   }
 
   const renderContent = () => {
+    if (activeView === 'settings') {
+      return <SettingsView user={props.user} />;
+    }
+    
     if (isLoading || !data) return <FullScreenLoader message="Loading Command Center..." />;
     
     const inpatients = data.patients.filter(p => p.inpatientStay);
@@ -203,7 +209,7 @@ const CommandCenterDashboard: React.FC<CommandCenterDashboardProps> = (props) =>
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar />} header={<DashboardHeader {...props} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="" />}>
+    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Command Center" theme={props.theme} toggleTheme={props.toggleTheme} />}>
       {renderContent()}
     </DashboardLayout>
   );

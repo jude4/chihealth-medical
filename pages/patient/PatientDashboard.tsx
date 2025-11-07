@@ -15,7 +15,7 @@ import { BillingView } from './BillingView.tsx';
 import { EHRView } from '../../components/common/EHRView.tsx';
 import { SymptomChecker } from './SymptomChecker.tsx';
 import { WearablesView } from './WearablesView.tsx';
-import { SettingsView } from './SettingsView.tsx';
+import { SettingsView } from '../common/SettingsView.tsx';
 import { translations } from '../../translations.ts';
 
 export type PatientView = 'overview' | 'appointments' | 'messages' | 'prescriptions' | 'billing' | 'records' | 'symptom-checker' | 'wearables' | 'settings';
@@ -117,7 +117,7 @@ const PatientDashboard: React.FC<PatientDashboardProps> = (props) => {
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} t={t} />} header={<DashboardHeader {...props} onSwitchOrganization={() => {}} notifications={data?.notifications || []} onMarkNotificationsAsRead={fetchData} title={t('patientDashboard')} language={language} onLanguageChange={setLanguage}/>}>
+    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} t={t} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={() => {}} notifications={data?.notifications || []} onMarkNotificationsAsRead={fetchData} title={t('patientDashboard')} language={language} onLanguageChange={setLanguage} theme={props.theme} toggleTheme={props.toggleTheme}/>}>
       {renderContent()}
     </DashboardLayout>
   );

@@ -8,8 +8,9 @@ import { DashboardLayout } from '../../components/common/DashboardLayout.tsx';
 import { DashboardHeader } from '../../components/common/DashboardHeader.tsx';
 import { FullScreenLoader } from '../../components/common/FullScreenLoader.tsx';
 import { CheckInView } from './CheckInView.tsx';
+import { SettingsView } from '../common/SettingsView.tsx';
 
-type ReceptionistView = 'checkin' | 'walkin';
+type ReceptionistView = 'checkin' | 'walkin' | 'settings';
 
 interface ReceptionistDashboardProps {
   user: User;
@@ -33,7 +34,7 @@ const Sidebar: React.FC<{ activeView: ReceptionistView; setActiveView: (view: Re
     <aside className="sidebar">
       <button onClick={() => setActiveView('checkin')} className="sidebar-logo-button"><Logo /><h1>ChiHealth Reception</h1></button>
       <nav className="flex-1 space-y-1">{navItems.map(item => <NavLink key={item.id} item={item} />)}</nav>
-      <div><button onClick={() => {}} className={`sidebar-link`}><Icons.SettingsIcon /><span>Settings</span></button></div>
+      <div><button onClick={() => setActiveView('settings')} className={`sidebar-link ${activeView === 'settings' ? 'active' : ''}`}><Icons.SettingsIcon /><span>Settings</span></button></div>
     </aside>
   );
 };
@@ -73,12 +74,13 @@ const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = (props) => {
     switch (activeView) {
       case 'checkin': return <CheckInView appointments={data.appointments} patients={data.patients} onCheckIn={handleCheckIn} />;
       case 'walkin': return <div>Walk-in registration coming soon.</div>;
+      case 'settings': return <SettingsView user={props.user} />;
       default: return <div>Check-In</div>;
     }
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader {...props} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Receptionist Dashboard" />}>
+    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Receptionist Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
       {renderContent()}
     </DashboardLayout>
   );

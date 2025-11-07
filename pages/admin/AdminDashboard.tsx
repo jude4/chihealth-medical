@@ -12,11 +12,12 @@ import { SubscriptionView } from './SubscriptionView.tsx';
 import { AuditLogView } from './AuditLogView.tsx';
 import { DataManagementView } from './DataManagementView.tsx';
 import { FacilityManagementView } from './FacilityManagementView.tsx';
+import { SettingsView } from '../common/SettingsView.tsx';
 import * as api from '../../services/apiService.ts';
 import { useToasts } from '../../hooks/useToasts.ts';
 import { canAccessFeature } from '../../services/permissionService.ts';
 
-type AdminView = 'overview' | 'staff' | 'organizations' | 'subscription' | 'audit' | 'data' | 'facility';
+type AdminView = 'overview' | 'staff' | 'organizations' | 'subscription' | 'audit' | 'data' | 'facility' | 'settings';
 
 interface AdminDashboardProps {
   user: User;
@@ -46,7 +47,7 @@ const Sidebar: React.FC<{ activeView: AdminView; setActiveView: (view: AdminView
     <aside className="sidebar">
       <button onClick={() => setActiveView('overview')} className="sidebar-logo-button"><Logo /><h1>ChiHealth MediSecure</h1></button>
       <nav className="flex-1 space-y-1">{navItems.map(item => <NavLink key={item.id} item={item} />)}</nav>
-      <div><button onClick={() => {}} className={`sidebar-link`}><Icons.SettingsIcon /><span>Settings</span></button></div>
+      <div><button onClick={() => setActiveView('settings')} className={`sidebar-link ${activeView === 'settings' ? 'active' : ''}`}><Icons.SettingsIcon /><span>Settings</span></button></div>
     </aside>
   );
 };
@@ -91,12 +92,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case 'audit': return <AuditLogView />;
       case 'data': return <DataManagementView />;
       case 'facility': return <FacilityManagementView data={data} onUpdate={fetchData} />;
+      case 'settings': return <SettingsView user={props.user} />;
       default: return <div>Overview</div>;
     }
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar user={props.user} activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader {...props} notifications={data?.notifications || []} onMarkNotificationsAsRead={fetchData} title="Administrator Dashboard" />}>
+    <DashboardLayout sidebar={<Sidebar user={props.user} activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={data?.notifications || []} onMarkNotificationsAsRead={fetchData} title="Administrator Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
       {renderContent()}
     </DashboardLayout>
   );

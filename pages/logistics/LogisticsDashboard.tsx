@@ -9,8 +9,9 @@ import { DashboardHeader } from '../../components/common/DashboardHeader.tsx';
 import { FullScreenLoader } from '../../components/common/FullScreenLoader.tsx';
 import { TransportView } from './TransportView.tsx';
 import { LabSampleTrackingView } from './LabSampleTrackingView.tsx';
+import { SettingsView } from '../common/SettingsView.tsx';
 
-type LogisticsView = 'transport' | 'samples';
+type LogisticsView = 'transport' | 'samples' | 'settings';
 
 interface LogisticsDashboardProps {
   user: User;
@@ -34,7 +35,7 @@ const Sidebar: React.FC<{ activeView: LogisticsView; setActiveView: (view: Logis
     <aside className="sidebar">
       <button onClick={() => setActiveView('transport')} className="sidebar-logo-button"><Logo /><h1>ChiHealth Logistics</h1></button>
       <nav className="flex-1 space-y-1">{navItems.map(item => <NavLink key={item.id} item={item} />)}</nav>
-      <div><button onClick={() => {}} className={`sidebar-link`}><Icons.SettingsIcon /><span>Settings</span></button></div>
+      <div><button onClick={() => setActiveView('settings')} className={`sidebar-link ${activeView === 'settings' ? 'active' : ''}`}><Icons.SettingsIcon /><span>Settings</span></button></div>
     </aside>
   );
 };
@@ -80,12 +81,13 @@ const LogisticsDashboard: React.FC<LogisticsDashboardProps> = (props) => {
     switch (activeView) {
       case 'transport': return <TransportView requests={data.transportRequests} onUpdateStatus={handleUpdateTransportStatus} />;
       case 'samples': return <LabSampleTrackingView labTests={data.labSamples} onUpdateStatus={handleUpdateSampleStatus} />;
+      case 'settings': return <SettingsView user={props.user} />;
       default: return <div>Transport Requests</div>;
     }
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader {...props} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Logistics Dashboard" />}>
+    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Logistics Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
       {renderContent()}
     </DashboardLayout>
   );

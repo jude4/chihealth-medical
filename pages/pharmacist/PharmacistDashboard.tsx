@@ -10,8 +10,9 @@ import { FullScreenLoader } from '../../components/common/FullScreenLoader.tsx';
 import { PharmacyQueueView } from './PharmacyQueueView.tsx';
 import { SafetyCheckModal } from '../../components/pharmacist/SafetyCheckModal.tsx';
 import { runPharmacySafetyCheck } from '../../services/geminiService.ts';
+import { SettingsView } from '../common/SettingsView.tsx';
 
-type PharmacistView = 'queue' | 'inventory' | 'history';
+type PharmacistView = 'queue' | 'inventory' | 'history' | 'settings';
 
 interface PharmacistDashboardProps {
   user: User;
@@ -36,7 +37,7 @@ const Sidebar: React.FC<{ activeView: PharmacistView; setActiveView: (view: Phar
     <aside className="sidebar">
       <button onClick={() => setActiveView('queue')} className="sidebar-logo-button"><Logo /><h1>ChiHealth Pharmacy</h1></button>
       <nav className="flex-1 space-y-1">{navItems.map(item => <NavLink key={item.id} item={item} />)}</nav>
-      <div><button onClick={() => {}} className={`sidebar-link`}><Icons.SettingsIcon /><span>Settings</span></button></div>
+      <div><button onClick={() => setActiveView('settings')} className={`sidebar-link ${activeView === 'settings' ? 'active' : ''}`}><Icons.SettingsIcon /><span>Settings</span></button></div>
     </aside>
   );
 };
@@ -99,13 +100,14 @@ const PharmacistDashboard: React.FC<PharmacistDashboardProps> = (props) => {
       case 'queue': return <PharmacyQueueView prescriptions={data.prescriptions} patients={data.patients} doctors={data.doctors} onUpdateStatus={handleUpdateStatus} onRunSafetyCheck={handleRunSafetyCheck} />;
       case 'inventory': return <div>Inventory Management Coming Soon</div>;
       case 'history': return <div>Dispensing History Coming Soon</div>;
+      case 'settings': return <SettingsView user={props.user} />;
       default: return <div>Queue</div>;
     }
   };
 
   return (
     <>
-      <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader {...props} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Pharmacist Dashboard" />}>
+      <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Pharmacist Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
         {renderContent()}
       </DashboardLayout>
       <SafetyCheckModal 
