@@ -2,8 +2,12 @@
   "name": "chihealth-monorepo",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "vite",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
@@ -27,6 +31,7 @@
     "jsdom": "^24.1.0",
     "typescript": "^5.2.2",
     "vite": "^5.0.0",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "concurrently": "^8.2.2"
   }
 }

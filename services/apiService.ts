@@ -18,33 +18,55 @@ export const clearAuthToken = (): void => {
 
 // --- API Fetch Wrapper ---
 const apiFetch = async (url: string, options: RequestInit = {}) => {
-  const token = getAuthToken();
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-  };
+  try {
+    const token = getAuthToken();
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
 
-  const response = await fetch(`/api${url}`, { ...options, headers });
+    const response = await fetch(`/api${url}`, { ...options, headers });
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      // Unauthorized, clear token and force re-login
-      clearAuthToken();
-      window.location.href = '/'; 
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Unauthorized, clear token but don't redirect during initial load
+        clearAuthToken();
+        // Only redirect if we're not on the initial page load
+        if (document.readyState === 'complete') {
+          // Page already loaded, safe to redirect
+          window.location.href = '/'; 
+        }
+        // Otherwise, let the app handle the auth state naturally
+      }
+      const errorData = await response.json().catch(() => ({ message: 'An unknown API error occurred.' }));
+      throw new Error(errorData.message);
     }
-    const errorData = await response.json().catch(() => ({ message: 'An unknown API error occurred.' }));
-    throw new Error(errorData.message);
+    
+    if (response.headers.get('content-type')?.includes('application/json')) {
+      return response.json();
+    }
+    return response.text();
+  } catch (error) {
+    // Handle network errors (backend not running, CORS, etc.)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      console.warn('API request failed - backend may not be running:', url);
+      throw new Error('Unable to connect to server. Please check if the backend is running.');
+    }
+    throw error;
   }
-  
-  if (response.headers.get('content-type')?.includes('application/json')) {
-    return response.json();
-  }
-  return response.text();
 };
 
 // --- Auth & User ---
-export const fetchCurrentUser = (): Promise<User> => apiFetch('/users/me');
+export const fetchCurrentUser = (): Promise<User> => {
+  // Add timeout to prevent hanging
+  return Promise.race([
+    apiFetch('/users/me'),
+    new Promise<User>((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout - backend may not be running')), 2000)
+    )
+  ]);
+};
 
 export const getSsoUserData = (tempToken: string): Promise<Partial<Patient>> => {
     return apiFetch(`/auth/sso/user-data?tempToken=${tempToken}`);

@@ -1,4 +1,6 @@
-import { hashPasswordSync } from 'bcryptjs';
+import bcrypt from 'bcryptjs';
+
+const hashPasswordSync = bcrypt.hashSync;
 
 // This function generates the initial seed data for the in-memory database.
 export const seedData = () => {

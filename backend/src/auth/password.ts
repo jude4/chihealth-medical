@@ -1,4 +1,4 @@
-import { hash, compare, hashSync } from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 10;
 
@@ -8,14 +8,14 @@ const SALT_ROUNDS = 10;
  * @returns A promise that resolves to the hashed password.
  */
 export const hashPassword = (password: string): Promise<string> => {
-  return hash(password, SALT_ROUNDS);
+  return bcrypt.hash(password, SALT_ROUNDS);
 };
 
 /**
  * A synchronous version of hashPassword, useful for seeding.
  */
 export const hashPasswordSync = (password: string): string => {
-  return hashSync(password, SALT_ROUNDS);
+  return bcrypt.hashSync(password, SALT_ROUNDS);
 };
 
 
@@ -26,5 +26,5 @@ export const hashPasswordSync = (password: string): string => {
  * @returns A promise that resolves to true if the passwords match, false otherwise.
  */
 export const comparePassword = (password: string, hash: string): Promise<boolean> => {
-  return compare(password, hash);
+  return bcrypt.compare(password, hash);
 };

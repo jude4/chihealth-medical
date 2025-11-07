@@ -5,6 +5,7 @@ import url from 'url';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import passport from 'passport';
 import cookieParser from 'cookie-parser';
 import process from 'process';
@@ -263,20 +264,44 @@ app.post('/api/messages', authenticate, async (req, res) => {
 })
 
 // --- Static File Serving ---
-// This is the definitive fix. It creates a reliable path from the compiled
-// script's location (__dirname, which is in backend/lib) up two levels to the
-// project root, and then into the 'dist' folder.
+// Only serve static files in production (when dist folder exists)
+// In development, the frontend runs separately on port 5173
 const distPath = path.join(__dirname, '..', '..', 'dist');
-app.use(express.static(distPath));
+const distExists = fs.existsSync(distPath);
 
-// The "catchall" handler: for any request that doesn't
-// match one above, send back React's index.html file from the build directory.
-app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
-});
+if (distExists) {
+  app.use(express.static(distPath));
+  
+  // The "catchall" handler: for any request that doesn't
+  // match one above, send back React's index.html file from the build directory.
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  // In development mode, return a helpful message for non-API routes
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/ws')) {
+      res.status(404).json({ 
+        message: 'Frontend not built. In development, access the frontend at http://localhost:5173',
+        hint: 'Run "npm run dev:all" to start both frontend and backend servers'
+      });
+    } else {
+      res.status(404).json({ message: 'Not found' });
+    }
+  });
+}
 
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+}).on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Error: Port ${PORT} is already in use.`);
+    console.error(`   Please stop the process using port ${PORT} or use a different port.`);
+    console.error(`   To find and kill the process: netstat -ano | findstr :${PORT}\n`);
+  } else {
+    console.error('Server error:', err);
+  }
+  process.exit(1);
 });
