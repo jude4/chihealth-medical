@@ -41,6 +41,11 @@ const PatientVitalsCard: React.FC<{ patient: Patient }> = ({ patient }) => {
                 <div>
                     <h3 className="font-bold text-lg text-text-primary">{patient.name}</h3>
                     <p className="text-sm text-text-secondary">Room: {inpatientInfo.roomNumber}</p>
+                    <p className="text-xs text-text-tertiary">Last updated: {(() => {
+                        const t = (inpatientInfo.vitalHistory && inpatientInfo.vitalHistory[0]?.timestamp) || (patient.vitalHistory && patient.vitalHistory[0]?.timestamp);
+                        if (!t) return 'Unknown';
+                        try { return new Date(String(t)).toLocaleString(); } catch { return 'Unknown'; }
+                    })()}</p>
                 </div>
                 <Button onClick={handleAnalyzeVitals} isLoading={isLoading}>
                     <SparklesIcon className="w-4 h-4 mr-2"/>

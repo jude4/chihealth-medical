@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Patient, Appointment, LabTest, ClinicalNote, Message } from '../../types.ts';
+import { User, Patient, LabTest, Message } from '../../types.ts';
 import * as api from '../../services/apiService.ts';
 import { useToasts } from '../../hooks/useToasts.ts';
 import * as Icons from '../../components/icons/index.tsx';
@@ -16,6 +16,7 @@ import { LabRequestsView } from './LabRequestsView.tsx';
 import { MessagingView } from '../../components/common/MessagingView.tsx';
 import { TelemedicineView } from '../common/TelemedicineView.tsx';
 import { ClinicalNoteModal } from '../../components/hcw/ClinicalNoteModal.tsx';
+import { generatePdfFromHtml } from '../../utils/generatePdf.ts';
 import { generateAiChannelResponse } from '../../services/geminiService.ts';
 import { SettingsView } from '../common/SettingsView.tsx';
 
@@ -125,9 +126,32 @@ const HealthcareWorkerDashboard: React.FC<HealthcareWorkerDashboardProps> = (pro
     
     switch (activeView) {
       case 'overview': return <HCWDashboardOverview user={props.user} appointments={data.appointments} messages={data.messages} labTests={data.labTests} />;
-      case 'schedule': return <ScheduleView appointments={data.appointments} patients={data.patients} onStartCall={handleStartCall} />;
+  case 'schedule': return <ScheduleView appointments={data.appointments} patients={data.patients} onStartCall={handleStartCall} onRefresh={fetchData} />;
       case 'patients': return <MyPatientsView patients={data.patients} onSelectPatient={handleSelectPatient} />;
-      case 'ehr': return selectedPatient ? <EHRView patient={selectedPatient} currentUser={props.user} clinicalNotes={[]} labTests={data.labTests.filter((l: LabTest) => l.patientId === selectedPatient.id)} onDownload={() => {}} onBack={() => setActiveView('patients')} onCreateClinicalNote={async (note) => { await api.createClinicalNote(note); addToast('Note saved.', 'success'); fetchData(); }} onOrderLabTest={async (test) => { await api.orderLabTest(test); addToast('Lab test ordered.', 'success'); fetchData(); }} onCreatePrescription={async (rx) => { await api.createPrescription(rx); addToast('Prescription created.', 'success'); fetchData(); }} onReferPatient={async (ref) => { await api.referPatient(ref); addToast('Referral sent.', 'success'); fetchData(); }} /> : <div>Please select a patient.</div>;
+      case 'ehr': return selectedPatient ? <EHRView
+        patient={selectedPatient}
+        currentUser={props.user}
+        clinicalNotes={[]}
+        labTests={data.labTests.filter((l: LabTest) => l.patientId === selectedPatient.id)}
+        onDownload={async () => {
+          const notesHtml = '';
+          const labsHtml = data.labTests.filter((l: LabTest) => l.patientId === selectedPatient.id).map((l: LabTest) => `<div><strong>${l.testName}</strong>: ${l.result || 'Pending'} (${l.status})</div>`).join('');
+          const html = `
+            <h1>Patient: ${selectedPatient.name} (ID: ${selectedPatient.id})</h1>
+            <p>DOB: ${selectedPatient.dateOfBirth || ''}</p>
+            <h2>Clinical Notes</h2>
+            ${notesHtml || '<p>No notes available</p>'}
+            <h2>Lab Tests</h2>
+            ${labsHtml || '<p>No lab results</p>'}
+          `;
+          try { await generatePdfFromHtml(html); } catch (err) { console.error('Failed to open print window', err); addToast('Failed to generate PDF.', 'error'); }
+        }}
+        onBack={() => setActiveView('patients')}
+        onCreateClinicalNote={async (note) => { await api.createClinicalNote(note); addToast('Note saved.', 'success'); fetchData(); }}
+        onOrderLabTest={async (test) => { await api.orderLabTest(test); addToast('Lab test ordered.', 'success'); fetchData(); }}
+        onCreatePrescription={async (rx) => { await api.createPrescription(rx); addToast('Prescription created.', 'success'); fetchData(); }}
+        onReferPatient={async (ref) => { await api.referPatient(ref); addToast('Referral sent.', 'success'); fetchData(); }}
+      /> : <div>Please select a patient.</div>;
       case 'prescriptions': return <PrescriptionsView prescriptions={data.prescriptions} patients={data.patients} onCreatePrescription={async (rx) => { await api.createPrescription(rx); addToast('Prescription created.', 'success'); fetchData(); }} />;
       case 'labs': return <LabRequestsView labTests={data.labTests} />;
       case 'messages': return <MessagingView messages={data.messages} currentUser={props.user} contacts={data.patients} onSendMessage={async (rec, content, patId) => { await api.sendMessage({recipientId: rec, content, patientId: patId, senderId: props.user.id}); fetchData(); }} onStartCall={(contact) => handleStartCall(contact.id)} onAiChannelCommand={handleAiCommand} />;
@@ -138,7 +162,7 @@ const HealthcareWorkerDashboard: React.FC<HealthcareWorkerDashboardProps> = (pro
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Clinician Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
+  <DashboardLayout onSignOut={props.onSignOut} sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Clinician Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
       {renderContent()}
        {selectedPatient && <ClinicalNoteModal isOpen={isNoteModalOpen} onClose={() => setNoteModalOpen(false)} patient={selectedPatient} doctor={props.user} onSave={async (note) => { await api.createClinicalNote(note); addToast('Note from call saved.', 'success'); fetchData(); setNoteModalOpen(false); setNoteFromCall(''); }} initialContent={noteFromCall} />}
     </DashboardLayout>

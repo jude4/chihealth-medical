@@ -12,6 +12,7 @@ interface CoachingCornerProps {
 export const CoachingCorner: React.FC<CoachingCornerProps> = ({ patient, carePlan }) => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [showFull, setShowFull] = useState(false);
 
   useEffect(() => {
     const fetchCoachingMessage = async () => {
@@ -43,7 +44,34 @@ export const CoachingCorner: React.FC<CoachingCornerProps> = ({ patient, carePla
           </div>
         ) : (
           <div className="coaching-card-content">
-            <MarkdownRenderer content={message} />
+            {(() => {
+              const trimmed = message ? message.trim() : '';
+              const looksLikeJson = /^\s*[\[{]/.test(trimmed);
+              const isLarge = trimmed.length > 800 || (looksLikeJson && trimmed.length > 200);
+
+              if (isLarge && !showFull) {
+                const preview = trimmed.slice(0, 400) + (trimmed.length > 400 ? '...' : '');
+                return (
+                  <>
+                    <MarkdownRenderer content={preview} />
+                    <div className="coaching-card-actions">
+                      <button type="button" className="link-button" onClick={() => setShowFull(true)}>Show full AI message</button>
+                    </div>
+                  </>
+                );
+              }
+
+              if (looksLikeJson || showFull) {
+                return (
+                  <div>
+                    <pre className="coaching-pre"><code>{trimmed}</code></pre>
+                    {isLarge && <div className="coaching-card-actions"><button type="button" className="link-button" onClick={() => setShowFull(false)}>Collapse</button></div>}
+                  </div>
+                );
+              }
+
+              return <MarkdownRenderer content={message} />;
+            })()}
           </div>
         )}
       </div>

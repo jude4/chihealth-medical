@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Organization } from '../../types.ts';
+import type { User } from '../../types.ts';
 import { Logo } from '../../components/common/Logo.tsx';
 import * as Icons from '../../components/icons/index.tsx';
 import { DashboardHeader } from '../../components/common/DashboardHeader.tsx';
@@ -98,7 +98,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar user={props.user} activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={data?.notifications || []} onMarkNotificationsAsRead={fetchData} title="Administrator Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
+  <DashboardLayout onSignOut={props.onSignOut} sidebar={<Sidebar user={props.user} activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={data?.notifications || []} onMarkNotificationsAsRead={fetchData} title="Administrator Dashboard" theme={props.theme} toggleTheme={props.toggleTheme} />}>
       {renderContent()}
     </DashboardLayout>
   );

@@ -1,5 +1,10 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from 'vite';
 import react from "@vitejs/plugin-react";
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+// ESM-safe __dirname for Vite config
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -11,21 +16,32 @@ export default defineConfig({
         target: "http://localhost:8080",
         changeOrigin: true,
       },
-      // Proxy WebSocket connections
+      // Proxy WebSocket connections. Use http target and changeOrigin so the
+      // dev server correctly performs the HTTP upgrade to WebSocket on the
+      // backend in a variety of dev environments.
       "/ws": {
-        target: "ws://localhost:8080",
+        target: "http://localhost:8080",
+        changeOrigin: true,
         ws: true,
       },
     },
   },
   optimizeDeps: {
-    include: ["@google/genai"],
+    // Do not pre-bundle the Node-only SDK. Use a browser shim via alias instead.
+    // Excluding the package prevents Vite's optimizeDeps from attempting to
+    // resolve and pre-bundle the server-only SDK which causes the dev server
+    // to fail with 'Failed to resolve entry for package "@google/genai"'.
+    exclude: ['@google/genai'],
     esbuildOptions: {
       target: "esnext",
     },
   },
   resolve: {
     conditions: ["browser", "module", "import"],
+    alias: {
+      // Resolve @google/genai imports in the browser to a small runtime shim
+      '@google/genai': resolve(__dirname, 'src/shims/genai-shim.ts')
+    }
   },
   test: {
     globals: true,

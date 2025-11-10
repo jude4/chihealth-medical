@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, CommandCenterData, Patient, Bed, Room } from '../../types.ts';
+import type { User, CommandCenterData, Bed, Room } from '../../types.ts';
 import * as api from '../../services/apiService.ts';
 import { useToasts } from '../../hooks/useToasts.ts';
 import * as Icons from '../../components/icons/index.tsx';
@@ -20,13 +20,13 @@ interface CommandCenterDashboardProps {
   toggleTheme: () => void;
 }
 
-const Sidebar: React.FC<{ activeView: string; setActiveView: (view: string) => void }> = ({ activeView, setActiveView }) => {
-  const navItems = [{ id: 'overview', label: 'Operations Overview', icon: Icons.LayoutDashboardIcon }];
+const Sidebar: React.FC<{ activeView: 'overview' | 'settings'; setActiveView: React.Dispatch<React.SetStateAction<'overview' | 'settings'>> }> = ({ activeView, setActiveView }) => {
+        const navItems = [{ id: 'overview', label: 'Operations Overview', icon: Icons.LayoutDashboardIcon } as const] as const;
   return (
     <aside className="sidebar">
       <button onClick={() => setActiveView('overview')} className="sidebar-logo-button"><Logo /><h1>Command Center</h1></button>
       <nav className="flex-1 space-y-1">
-        {navItems.map(item => <button key={item.id} onClick={() => setActiveView(item.id)} className={`sidebar-link ${activeView === item.id ? 'active' : ''}`}><item.icon /><span>{item.label}</span></button>)}
+            {navItems.map(item => <button key={item.id} onClick={() => setActiveView(item.id)} className={`sidebar-link ${activeView === item.id ? 'active' : ''}`}><item.icon /><span>{item.label}</span></button>)}
       </nav>
       <div><button onClick={() => setActiveView('settings')} className={`sidebar-link ${activeView === 'settings' ? 'active' : ''}`}><Icons.SettingsIcon /><span>Settings</span></button></div>
     </aside>
@@ -209,7 +209,7 @@ const CommandCenterDashboard: React.FC<CommandCenterDashboardProps> = (props) =>
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Command Center" theme={props.theme} toggleTheme={props.toggleTheme} />}>
+    <DashboardLayout onSignOut={props.onSignOut} sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={props.onSwitchOrganization} notifications={[]} onMarkNotificationsAsRead={()=>{}} title="Command Center" theme={props.theme} toggleTheme={props.toggleTheme} />}>
       {renderContent()}
     </DashboardLayout>
   );

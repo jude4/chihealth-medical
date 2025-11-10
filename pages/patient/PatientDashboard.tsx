@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Patient, Appointment, Prescription, Message, User, CarePlan } from '../../types.ts';
+import { Patient, Appointment } from '../../types.ts';
 import * as api from '../../services/apiService.ts';
 import { useToasts } from '../../hooks/useToasts.ts';
 import * as Icons from '../../components/icons/index.tsx';
@@ -13,6 +13,7 @@ import { MessagingView } from '../../components/common/MessagingView.tsx';
 import { PrescriptionsView } from './PrescriptionsView.tsx';
 import { BillingView } from './BillingView.tsx';
 import { EHRView } from '../../components/common/EHRView.tsx';
+import { generatePdfFromHtml } from '../../utils/generatePdf.ts';
 import { SymptomChecker } from './SymptomChecker.tsx';
 import { WearablesView } from './WearablesView.tsx';
 import { SettingsView } from '../common/SettingsView.tsx';
@@ -104,11 +105,37 @@ const PatientDashboard: React.FC<PatientDashboardProps> = (props) => {
     
     switch (activeView) {
       case 'overview': return <DashboardOverview user={props.user} appointments={data.appointments} prescriptions={data.prescriptions} messages={data.messages} contacts={data.contacts} carePlan={data.carePlan} t={t} setActiveView={setActiveView} />;
-      case 'appointments': return <AppointmentsView appointments={data.appointments} rooms={data.rooms} onBookAppointment={handleBookAppointment} suggestedSpecialty={suggestedSpecialty} onSuggestionHandled={() => setSuggestedSpecialty(null)} />;
+  case 'appointments': return <AppointmentsView appointments={data.appointments} rooms={data.rooms} onBookAppointment={handleBookAppointment} suggestedSpecialty={suggestedSpecialty} onSuggestionHandled={() => setSuggestedSpecialty(null)} onRefresh={fetchData} />;
       case 'messages': return <MessagingView messages={data.messages} currentUser={props.user} contacts={data.contacts} onSendMessage={async (recId, content) => { await api.sendMessage({recipientId: recId, content, senderId: props.user.id}); fetchData(); }} onStartCall={() => {}} />;
       case 'prescriptions': return <PrescriptionsView prescriptions={data.prescriptions} />;
       case 'billing': return <BillingView bills={data.bills} onPayBill={async () => { addToast('Payment successful!', 'success'); fetchData();}} />;
-      case 'records': return <EHRView patient={props.user} currentUser={props.user} clinicalNotes={data.clinicalNotes} labTests={data.labTests} onDownload={() => alert("Downloading EHR...")} carePlan={data.carePlan} carePlanAdherence={data.carePlanAdherence} />;
+      case 'records': return <EHRView
+        patient={props.user}
+        currentUser={props.user}
+        clinicalNotes={data.clinicalNotes}
+        labTests={data.labTests}
+        onDownload={async () => {
+          // Build a small printable summary
+          const notesHtml = (data.clinicalNotes || []).map((n: any) => `<h4>${new Date(n.date).toDateString()} - Dr. ${n.doctorName}</h4><pre>${n.content}</pre>`).join('<hr/>');
+          const labsHtml = (data.labTests || []).map((l: any) => `<div><strong>${l.testName}</strong>: ${l.result || 'Pending'} (${l.status})</div>`).join('');
+          const html = `
+            <h1>Patient: ${props.user.name} (ID: ${props.user.id})</h1>
+            <p>DOB: ${props.user.dateOfBirth || ''}</p>
+            <h2>Clinical Notes</h2>
+            ${notesHtml || '<p>No notes available</p>'}
+            <h2>Lab Tests</h2>
+            ${labsHtml || '<p>No lab results</p>'}
+          `;
+          try {
+            await generatePdfFromHtml(html);
+          } catch (err) {
+            console.error('Failed to open print window', err);
+            alert('Failed to generate PDF.');
+          }
+        }}
+        carePlan={data.carePlan}
+        carePlanAdherence={data.carePlanAdherence}
+      />;
       case 'symptom-checker': return <SymptomChecker onBookAppointmentWithSuggestion={handleBookAppointmentWithSuggestion} />;
       case 'wearables': return <WearablesView patient={props.user} onSimulateData={handleSimulateWearableData} />;
       case 'settings': return <SettingsView user={props.user} />;
@@ -117,7 +144,7 @@ const PatientDashboard: React.FC<PatientDashboardProps> = (props) => {
   };
 
   return (
-    <DashboardLayout sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} t={t} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={() => {}} notifications={data?.notifications || []} onMarkNotificationsAsRead={fetchData} title={t('patientDashboard')} language={language} onLanguageChange={setLanguage} theme={props.theme} toggleTheme={props.toggleTheme}/>}>
+  <DashboardLayout onSignOut={props.onSignOut} sidebar={<Sidebar activeView={activeView} setActiveView={setActiveView} t={t} />} header={<DashboardHeader user={props.user} onSignOut={props.onSignOut} onSwitchOrganization={() => {}} notifications={data?.notifications || []} onMarkNotificationsAsRead={fetchData} title={t('patientDashboard')} language={language} onLanguageChange={setLanguage} theme={props.theme} toggleTheme={props.toggleTheme}/>}>
       {renderContent()}
     </DashboardLayout>
   );

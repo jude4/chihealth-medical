@@ -1,6 +1,6 @@
-import { User, Patient, Appointment, Prescription, LabTest, ClinicalNote, Message, UserRole, Organization, Bill, TriageEntry, Vitals, TransportRequest, Referral, Bed, ActivityLog, Department, Room, RoomType } from '../../types.ts';
-import { hashPassword, comparePassword } from './auth/password.ts';
-import { seedData } from '../prisma/seed.ts';
+import type { User, Patient, Appointment, Prescription, LabTest, ClinicalNote, Message, Organization, Bill, TriageEntry, TransportRequest, Referral, Bed, ActivityLog, Department, Room, RoomType } from '../../types.js';
+import { hashPassword, comparePassword } from './auth/password.js';
+import { seedData } from '../prisma/seed.js';
 
 const initialData = seedData();
 
@@ -26,12 +26,15 @@ let activityLogs: ActivityLog[] = initialData.activityLogs;
 export const findUserById = async (id: string): Promise<User | undefined> => users.find(u => u.id === id);
 export const findUserByEmail = async (email: string): Promise<User | undefined> => users.find(u => u.email === email);
 export const createUser = async (data: Partial<User> & { password?: string, dateOfBirth?: string }): Promise<User> => {
+    // Defensive validation: ensure required fields are present
+    if (!data.name) throw new Error('createUser: missing name');
+    if (!data.email) throw new Error('createUser: missing email');
     const passwordHash = data.password ? await hashPassword(data.password) : undefined;
     const defaultOrg = organizations[0];
     const newUser: User = {
         id: `user-new-${Date.now()}`,
-        name: data.name!,
-        email: data.email!,
+        name: data.name,
+        email: data.email,
         role: data.role || 'patient',
         passwordHash,
         organizations: [defaultOrg],
@@ -69,16 +72,21 @@ export const updateUser = async (id: string, data: Partial<User> & { organizatio
     }
     
     // This handles the case where only the current organization is changed via switcher
-    if (data.currentOrganization && user.organizations.some(org => org.id === data.currentOrganization!.id)) {
-      user.currentOrganization = data.currentOrganization;
-    }
+        if (data.currentOrganization && user.organizations.some((org: any) => org.id === data.currentOrganization!.id)) {
+            user.currentOrganization = data.currentOrganization;
+        }
+
+        // Support avatar URL updates
+        if ((data as any).avatarUrl) {
+            (user as any).avatarUrl = (data as any).avatarUrl;
+        }
 
     return user;
 };
 export const switchUserOrganization = async (userId: string, organizationId: string): Promise<User> => {
     const user = await findUserById(userId);
     const org = organizations.find(o => o.id === organizationId);
-    if (!user || !org || !user.organizations.some(o => o.id === org.id)) {
+    if (!user || !org || !user.organizations.some((o: any) => o.id === org.id)) {
         throw new Error("Invalid user or organization");
     }
     user.currentOrganization = org;
@@ -188,7 +196,7 @@ export const getAdminDashboardData = async (orgId: string) => {
      const childOrgs = organizations.filter(o => o.parentOrganizationId === orgId).map(o => o.id);
      const relevantOrgIds = [orgId, ...childOrgs];
 
-     const staff = users.filter(u => u.role !== 'patient' && u.organizations.some(org => relevantOrgIds.includes(org.id)));
+    const staff = users.filter(u => u.role !== 'patient' && u.organizations.some((org: any) => relevantOrgIds.includes(org.id)));
      const patients = users.filter(u => u.role === 'patient' && relevantOrgIds.includes(u.currentOrganization.id));
      const orgAppointments = appointments.filter(a => relevantOrgIds.includes(users.find(u => u.id === a.patientId)!.currentOrganization.id));
      const totalRevenue = bills.filter(b => b.status === 'Paid' && relevantOrgIds.includes(users.find(u => u.id === b.patientId)!.currentOrganization.id)).reduce((sum, b) => sum + b.amount, 0);
@@ -261,6 +269,26 @@ export const createAppointment = async (patientId: string, data: any) => {
     appointments.push(newAppt);
     return newAppt;
 };
+
+export const deleteAppointment = async (appointmentId: string) => {
+    const idx = appointments.findIndex(a => a.id === appointmentId);
+    if (idx === -1) return false;
+    appointments.splice(idx, 1);
+    return true;
+};
+
+export const updateAppointment = async (appointmentId: string, updates: Partial<Appointment>) => {
+    const appt = appointments.find(a => a.id === appointmentId);
+    if (!appt) throw new Error('Appointment not found');
+    // Only allow updating a small set of fields for the mock
+    if (updates.date) appt.date = updates.date;
+    if (updates.time) appt.time = updates.time;
+    if ((updates as any).consultingRoomName) appt.consultingRoomName = (updates as any).consultingRoomName;
+    if (updates.status) appt.status = updates.status as Appointment['status'];
+    if ((updates as any).doctorId) appt.doctorId = (updates as any).doctorId;
+    if ((updates as any).specialty) appt.specialty = (updates as any).specialty;
+    return appt;
+};
 export const createMessage = async (senderId: string, data: any) => {
     const newMsg: Message = { id: `msg-${Date.now()}`, senderId, timestamp: new Date().toISOString(), ...data };
     messages.push(newMsg);
@@ -320,7 +348,24 @@ export const recordVitals = async (patientId: string, vitals: any) => {
     if (triageIndex > -1) {
         triageQueue.splice(triageIndex, 1);
     }
-    // In a real app, this would update a vitals table
+    // Persist vitals into patient record for demo purposes
+    const patient = users.find(u => u.id === patientId) as Patient | undefined;
+    if (!patient) return;
+    const entry = { timestamp: new Date().toISOString(), ...vitals };
+    if (!patient.vitalHistory) patient.vitalHistory = [];
+    patient.vitalHistory.unshift(entry);
+
+    // If patient is admitted, update inpatient current vitals
+    if (patient.inpatientStay) {
+        patient.inpatientStay.currentVitals = {
+            heartRate: vitals.heartRate || patient.inpatientStay.currentVitals.heartRate,
+            bloodPressure: vitals.bloodPressure || patient.inpatientStay.currentVitals.bloodPressure,
+            respiratoryRate: vitals.respiratoryRate || patient.inpatientStay.currentVitals.respiratoryRate,
+            spO2: vitals.spO2 || patient.inpatientStay.currentVitals.spO2
+        };
+        if (!patient.inpatientStay.vitalHistory) patient.inpatientStay.vitalHistory = [];
+        patient.inpatientStay.vitalHistory.unshift({ timestamp: entry.timestamp, heartRate: entry.heartRate, bloodPressure: entry.bloodPressure, spO2: entry.spO2 });
+    }
 };
 export const updateTransportRequest = async (id: string, status: TransportRequest['status']) => {
     const req = transportRequests.find(t => t.id === id);
@@ -397,4 +442,23 @@ export const createBed = async (name: string, roomId: string): Promise<Bed> => {
     const newBed: Bed = { id: `bed-${Date.now()}`, name, roomId, isOccupied: false };
     beds.push(newBed);
     return newBed;
+};
+
+export const addWearableDevice = async (patientId: string, device: { name: string; type: string }) => {
+    const patient = users.find(u => u.id === patientId) as Patient | undefined;
+    if (!patient) throw new Error('Patient not found');
+    if (!patient.wearableDevices) patient.wearableDevices = [];
+    const newDevice = { id: `device-${Date.now()}`, name: device.name, type: device.type, addedAt: new Date().toISOString() } as any;
+    patient.wearableDevices.push(newDevice);
+    return newDevice;
+};
+
+export const removeWearableDevice = async (patientId: string, deviceId: string) => {
+    const patient = users.find(u => u.id === patientId) as Patient | undefined;
+    if (!patient) throw new Error('Patient not found');
+    if (!patient.wearableDevices) return false;
+    const idx = patient.wearableDevices.findIndex((d: any) => d.id === deviceId);
+    if (idx === -1) return false;
+    patient.wearableDevices.splice(idx, 1);
+    return true;
 };

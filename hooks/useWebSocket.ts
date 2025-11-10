@@ -14,29 +14,44 @@ export const useWebSocket = (userId: string | undefined, onRefetch: () => void) 
       return;
     }
 
-    const token = api.getAuthToken();
-    if (!token) return;
+  const token = api.getAuthToken();
+  if (!token) return;
 
-    // Determine protocol based on window location protocol
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?token=${token}`;
+  // Determine protocol based on window location protocol
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const encodedToken = encodeURIComponent(token);
+
+  // Build backend WS URL from API_BASE_URL when possible so we don't hardcode ports.
+  let wsUrlBackend: string | null = null;
+  try {
+    const parsed = new URL(api.API_BASE_URL);
+    wsUrlBackend = `${protocol}//${parsed.host}/ws?token=${encodedToken}`;
+  } catch (e) {
+    // fallback to the common dev backend host if parsing fails
+    wsUrlBackend = `${protocol}//localhost:8080/ws?token=${encodedToken}`;
+  }
+
+  const wsUrlProxy = `${protocol}//${window.location.host}/ws?token=${encodedToken}`;
+
+  // If the backend host differs from the current host (typical dev: 8080 vs 5173/5174),
+  // prefer connecting directly to backend first to avoid proxy websocket issues.
+  const preferDirect = (() => {
+    try { return new URL(api.API_BASE_URL).host !== window.location.host; } catch { return true; }
+  })();
     
     let reconnectTimeout: number | undefined;
 
-    function connect() {
-      // Avoid creating multiple connections
-      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-        return;
-      }
-      
-      ws.current = new WebSocket(wsUrl);
+    let triedDirect = false;
 
-      ws.current.onopen = () => {
-        console.log('WebSocket connected');
+    function makeSocket(url: string) {
+      console.info('Attempting WebSocket connection to', url);
+      const s = new WebSocket(url);
+      s.onopen = () => {
+        console.log('WebSocket connected to', url);
         clearTimeout(reconnectTimeout);
       };
 
-      ws.current.onmessage = (event) => {
+      s.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
           if (message.type === 'refetch') {
@@ -48,16 +63,44 @@ export const useWebSocket = (userId: string | undefined, onRefetch: () => void) 
         }
       };
 
-      ws.current.onclose = () => {
+      s.onclose = () => {
         console.log('WebSocket disconnected. Attempting to reconnect...');
-        // Simple exponential backoff could be added here
         reconnectTimeout = window.setTimeout(connect, 3000); // Reconnect after 3 seconds
       };
 
-      ws.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        ws.current?.close(); // This will trigger the onclose handler for reconnection
+      s.onerror = (error) => {
+        console.error('WebSocket error connecting to', url, error);
+        // If this was the proxy attempt, try backend directly once
+        if (url === wsUrlProxy && !triedDirect) {
+          triedDirect = true;
+          try {
+            s.close();
+          } catch (_) {}
+          console.warn('Proxy failed; attempting direct backend WebSocket at', wsUrlBackend);
+          // Delay slightly before trying backend URL
+          if (wsUrlBackend) {
+            window.setTimeout(() => {
+              ws.current = makeSocket(wsUrlBackend as string);
+            }, 200);
+          }
+          return;
+        }
+        try { s.close(); } catch (_) {}
       };
+
+      return s;
+    }
+
+    function connect() {
+      // Avoid creating multiple connections
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) return;
+      // Choose initial target based on whether we prefer direct backend connections
+      if (preferDirect && wsUrlBackend) {
+        console.info('Preferring direct backend WebSocket at', wsUrlBackend);
+        ws.current = makeSocket(wsUrlBackend);
+      } else {
+        ws.current = makeSocket(wsUrlProxy);
+      }
     }
 
     connect();

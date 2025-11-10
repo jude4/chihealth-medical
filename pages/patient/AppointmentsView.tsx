@@ -4,6 +4,9 @@ import { Button } from '../../components/common/Button.tsx';
 import { BookingModal } from './BookingModal.tsx';
 import { EmptyState } from '../../components/common/EmptyState.tsx';
 import { CalendarIcon } from '../../components/icons/index.tsx';
+import * as api from '../../services/apiService.ts';
+import { ConfirmationModal } from '../../components/common/ConfirmationModal.tsx';
+import { RescheduleModal } from '../../components/common/RescheduleModal.tsx';
 
 interface AppointmentsViewProps {
   appointments: Appointment[];
@@ -11,10 +14,14 @@ interface AppointmentsViewProps {
   onBookAppointment: (newAppointment: Omit<Appointment, 'id' | 'status' | 'patientId'>) => void;
   suggestedSpecialty?: string | null;
   onSuggestionHandled: () => void;
+  onRefresh?: () => void;
 }
 
-export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ appointments, rooms, onBookAppointment, suggestedSpecialty, onSuggestionHandled }) => {
+export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ appointments, rooms, onBookAppointment, suggestedSpecialty, onSuggestionHandled, onRefresh }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [activeAppt, setActiveAppt] = useState<Appointment | null>(null);
 
   useEffect(() => {
     if (suggestedSpecialty) {
@@ -54,7 +61,11 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ appointments
                       <p className="font-semibold text-text-primary">{appt.specialty} with {appt.doctorName}</p>
                       <p className="text-sm text-text-secondary">{new Date(appt.date).toDateString()} at {appt.time} in <span className="font-medium">{appt.consultingRoomName}</span></p>
                     </div>
-                    <span className="status-chip status-chip-cyan">{appt.status}</span>
+                    <div className="flex items-center gap-3">
+                      <button className="link-button" onClick={() => { setActiveAppt(appt); setConfirmOpen(true); }}>Cancel</button>
+                      <button className="link-button" onClick={() => { setActiveAppt(appt); setRescheduleOpen(true); }}>Reschedule</button>
+                      <span className="status-chip status-chip-cyan">{appt.status}</span>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -93,6 +104,21 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ appointments
         suggestedSpecialty={suggestedSpecialty}
         rooms={rooms}
       />
+      <ConfirmationModal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={async () => {
+        if (!activeAppt) return;
+        try {
+          await api.deleteAppointment(activeAppt.id);
+          if (onRefresh) onRefresh(); else window.location.reload();
+        } catch (err: any) {
+          alert('Failed to cancel: ' + (err.message || err));
+        }
+      }} title="Cancel Appointment" message={`Are you sure you want to cancel the appointment on ${activeAppt ? new Date(activeAppt.date).toDateString() + ' at ' + activeAppt.time : ''}?`} type="danger" />
+
+      <RescheduleModal isOpen={rescheduleOpen} onClose={() => setRescheduleOpen(false)} initialDate={activeAppt?.date} initialTime={activeAppt?.time} onSave={async (date, time) => {
+        if (!activeAppt) return;
+        await api.rescheduleAppointment(activeAppt.id, { date, time });
+        if (onRefresh) onRefresh(); else window.location.reload();
+      }} />
     </>
   );
 };

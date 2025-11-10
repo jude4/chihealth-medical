@@ -648,6 +648,28 @@ html.dark .sso-btn:hover:not(:disabled) {
   font-size: 1.375rem;
 }
 
+/* EHR view action toolbar */
+.ehr-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.ehr-action-left {
+  margin-right: 0.5rem;
+}
+.ehr-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ehr-action-buttons .btn {
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+}
+.ehr-action-buttons .btn svg { margin-right: 0.5rem; }
+
+
 /* Dashboard Content Text Styles */
 .dashboard-content h1,
 .dashboard-content h2,
@@ -1505,7 +1527,9 @@ html.dark .theme-toggle-button:hover {
   list-style: none;
   padding: 0;
   margin: 0;
-  space-y: 1rem;
+}
+.care-plan-list > li {
+  margin-bottom: 1rem;
 }
 .care-plan-item {
   font-size: 0.875rem;
@@ -1550,6 +1574,59 @@ html.dark .coaching-card {
 }
 .coaching-card-content .prose strong {
     color: var(--text-primary);
+}
+
+/* Prevent long AI-generated JSON or unbroken text from breaking the card layout */
+.coaching-card {
+  align-items: flex-start; /* ensure icon and content align at top */
+}
+.coaching-card > .flex-1 {
+  /* allow content to shrink inside a flex container so long words don't force overflow */
+  min-width: 0;
+}
+.coaching-card-content {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.coaching-card-content pre,
+.coaching-card-content code {
+  white-space: pre-wrap; /* wrap long lines */
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto; /* scroll large blocks */
+  background: var(--background-secondary);
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+}
+
+/* Coaching corner helper classes */
+.coaching-card-actions {
+  margin-top: 0.5rem;
+}
+.link-button {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+}
+.link-button:hover {
+  background: var(--primary-light-bg);
+}
+.coaching-pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow: auto;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-primary);
 }
 
 /* Care Plan Adherence */
@@ -2827,4 +2904,18 @@ td .empty-state-message {
   background-color: var(--primary-light-bg);
   color: var(--primary);
   font-weight: 500;
+}
+/* Profile avatar used in Settings and header */
+.profile-avatar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.profile-avatar {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 9999px;
+  border: 2px solid var(--border-primary);
+  object-fit: cover;
 }

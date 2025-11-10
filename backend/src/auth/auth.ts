@@ -3,8 +3,8 @@ import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import * as db from '../db';
-import { User, Patient } from '../../../types';
+import * as db from '../db.js';
+import type { User, Patient } from '../../../types.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-default-super-secret-key-that-is-long';
 const router = Router();
@@ -27,7 +27,10 @@ passport.use(new GoogleStrategy({
     // These should be configured in your environment variables for production
     clientID: process.env.GOOGLE_CLIENT_ID || 'mock-client-id',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'mock-client-secret',
-    callbackURL: '/api/auth/google/callback'
+    // Use an explicit callback URL so the redirect_uri exactly matches the
+    // value registered in the Google Cloud Console. Prefer an env var but
+    // fall back to API_BASE_URL or localhost:8080 for development.
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || `${process.env.API_BASE_URL || 'http://localhost:8080'}/api/auth/google/callback`
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -61,6 +64,9 @@ passport.use(new GoogleStrategy({
   }
 ));
 
+// Debugging: log the configured Google callback URL
+console.info('Google OAuth callbackURL =', process.env.GOOGLE_CALLBACK_URL || `${process.env.API_BASE_URL || 'http://localhost:8080'}/api/auth/google/callback`);
+
 // --- Auth Routes ---
 
 // Local Email/Password Registration
@@ -74,17 +80,23 @@ router.post('/register',
         return res.status(400).json({ message: errors.array().map(e => e.msg).join(', ') });
     }
 
+    // Log the incoming body for debugging in development
+    console.info('Register endpoint called with body:', req.body);
+
     const { fullName, email, password } = req.body;
     try {
         const existingUser = await db.findUserByEmail(email);
         if (existingUser) {
             return res.status(409).json({ message: 'An account with this email already exists.' });
         }
-        const user = await db.createUser({ name: fullName, email, password, role: 'patient' });
-        res.status(201).json({ user });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error during registration.' });
+    const user = await db.createUser({ name: fullName, email, password, role: 'patient' });
+    return res.status(201).json({ user });
+    } catch (error: any) {
+        console.error('Registration error:', error);
+        const payload: any = { message: 'Server error during registration.' };
+        if (process.env.NODE_ENV !== 'production') payload.detail = error.message || String(error);
+        if (process.env.NODE_ENV !== 'production' && error?.stack) payload.stack = error.stack;
+    return res.status(500).json(payload);
     }
 });
 
@@ -105,9 +117,13 @@ router.post('/login',
             return res.status(401).json({ message: 'Invalid email or password.' });
         }
         const token = generateToken(user.id, user.currentOrganization.id);
-        res.json({ user, token });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error during login.' });
+        return res.json({ user, token });
+    } catch (error: any) {
+    console.error('Login error:', error);
+    const payload: any = { message: 'Server error during login.' };
+    if (process.env.NODE_ENV !== 'production') payload.detail = error.message || String(error);
+    if (process.env.NODE_ENV !== 'production' && error?.stack) payload.stack = error.stack;
+    return res.status(500).json(payload);
     }
 });
 
@@ -123,10 +139,14 @@ router.post('/register-org', async (req: Request, res: Response) => {
         if (existingAdmin) {
             return res.status(409).json({ message: 'An admin with this email-already-in-use' });
         }
-        const { organization, admin } = await db.createOrganizationAndAdmin(orgData, adminData);
-        res.status(201).json({ organization, admin: { id: admin.id, name: admin.name } });
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to create organization.' });
+    const { organization, admin } = await db.createOrganizationAndAdmin(orgData, adminData);
+    return res.status(201).json({ organization, admin: { id: admin.id, name: admin.name } });
+    } catch (error: any) {
+    console.error('Create org error:', error);
+    const payload: any = { message: 'Failed to create organization.' };
+    if (process.env.NODE_ENV !== 'production') payload.detail = error.message || String(error);
+    if (process.env.NODE_ENV !== 'production' && error?.stack) payload.stack = error.stack;
+    return res.status(500).json(payload);
     }
 });
 
@@ -155,9 +175,9 @@ router.get('/sso/user-data', (req: Request, res: Response) => {
         if (!tempUser) {
             return res.status(404).json({ message: "Session expired or invalid." });
         }
-        res.json(tempUser);
+        return res.json(tempUser);
     } catch (error) {
-        res.status(401).json({ message: "Invalid token." });
+        return res.status(401).json({ message: "Invalid token." });
     }
 });
 
@@ -186,12 +206,12 @@ router.post('/sso/complete', async (req: Request, res: Response) => {
         ssoTempStore.delete(tempToken);
 
         // Generate the final authentication token and send the response
-        const token = generateToken(newUser.id, newUser.currentOrganization.id);
-        res.status(201).json({ user: newUser, token });
+    const token = generateToken(newUser.id, newUser.currentOrganization.id);
+    return res.status(201).json({ user: newUser, token });
 
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to complete registration.' });
-    }
+        } catch (error) {
+            return res.status(500).json({ message: 'Failed to complete registration.' });
+        }
 });
 
 

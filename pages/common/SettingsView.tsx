@@ -16,7 +16,6 @@ type SettingsTab = 'profile' | 'security' | 'notifications' | 'preferences' | 'r
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
-  const { addToast } = useToasts();
   const [isSaving, setIsSaving] = useState(false);
 
   const tabs: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
@@ -127,16 +126,40 @@ const ProfileSettings: React.FC<{
     <div>
       <h3 className="text-xl font-semibold mb-6">Personal Information</h3>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '42rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div className="profile-avatar-wrapper">
           <img
-            src={`https://i.pravatar.cc/150?u=${user.id}`}
+            src={(user as any).avatarUrl || `https://i.pravatar.cc/150?u=${user.id}`}
             alt={user.name}
-            style={{ width: '6rem', height: '6rem', borderRadius: '9999px', border: '2px solid var(--border-primary)', objectFit: 'cover' }}
+            className="profile-avatar"
           />
           <div>
-            <Button type="button" onClick={() => addToast('Avatar upload coming soon', 'info')}>
-              Change Photo
-            </Button>
+            <input
+              id="avatarInput"
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={async (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                if (file.size > 2 * 1024 * 1024) {
+                  addToast('File too large. Maximum 2MB.', 'error');
+                  return;
+                }
+                try {
+                  setIsSaving(true);
+                  const res = await api.uploadAvatar(file as File);
+                  addToast('Avatar uploaded.', 'success');
+                  const updatedUser = res.user || {};
+                  if (onUpdate) onUpdate(updatedUser);
+                } catch (err: any) {
+                  console.error('Avatar upload failed', err);
+                  addToast(err?.message || 'Failed to upload avatar', 'error');
+                } finally { setIsSaving(false); }
+              }}
+            />
+            <label htmlFor="avatarInput">
+              <Button type="button">Change Photo</Button>
+            </label>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>JPG, PNG or GIF. Max size 2MB</p>
           </div>
         </div>
@@ -178,7 +201,7 @@ const ProfileSettings: React.FC<{
   );
 };
 
-const NotificationSettings: React.FC<{ user: User | Patient }> = ({ user }) => {
+const NotificationSettings: React.FC<{ user: User | Patient }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
@@ -225,7 +248,7 @@ const NotificationSettings: React.FC<{ user: User | Patient }> = ({ user }) => {
   );
 };
 
-const PreferencesSettings: React.FC<{ user: User | Patient }> = ({ user }) => {
+const PreferencesSettings: React.FC<{ user: User | Patient }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [preferences, setPreferences] = useState({
     language: 'en',
@@ -314,31 +337,31 @@ const PreferencesSettings: React.FC<{ user: User | Patient }> = ({ user }) => {
   );
 };
 
-const RoleSpecificSettings: React.FC<{ user: User | Patient }> = ({ user }) => {
-  switch (user.role) {
+const RoleSpecificSettings: React.FC<{ user: User | Patient }> = ({ user: _user }) => {
+  switch (_user.role) {
     case 'hcw':
-      return <HCWSettings user={user} />;
+      return <HCWSettings user={_user as User} />;
     case 'nurse':
-      return <NurseSettings user={user} />;
+      return <NurseSettings user={_user as User} />;
     case 'pharmacist':
-      return <PharmacistSettings user={user} />;
+      return <PharmacistSettings user={_user as User} />;
     case 'lab_technician':
-      return <LabTechnicianSettings user={user} />;
+      return <LabTechnicianSettings user={_user as User} />;
     case 'admin':
-      return <AdminSettings user={user} />;
+      return <AdminSettings user={_user as User} />;
     case 'receptionist':
-      return <ReceptionistSettings user={user} />;
+      return <ReceptionistSettings user={_user as User} />;
     case 'logistics':
-      return <LogisticsSettings user={user} />;
+      return <LogisticsSettings user={_user as User} />;
     case 'command_center':
-      return <CommandCenterSettings user={user} />;
+      return <CommandCenterSettings user={_user as User} />;
     default:
       return <div>No role-specific settings available</div>;
   }
 };
 
 // Role-specific settings components
-const HCWSettings: React.FC<{ user: User }> = ({ user }) => {
+const HCWSettings: React.FC<{ user: User }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [settings, setSettings] = useState({
     defaultNoteTemplate: 'soap',
@@ -408,7 +431,7 @@ const HCWSettings: React.FC<{ user: User }> = ({ user }) => {
   );
 };
 
-const NurseSettings: React.FC<{ user: User }> = ({ user }) => {
+const NurseSettings: React.FC<{ user: User }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [settings, setSettings] = useState({
     triagePriority: 'high',
@@ -456,7 +479,7 @@ const NurseSettings: React.FC<{ user: User }> = ({ user }) => {
   );
 };
 
-const PharmacistSettings: React.FC<{ user: User }> = ({ user }) => {
+const PharmacistSettings: React.FC<{ user: User }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [settings, setSettings] = useState({
     autoSafetyCheck: true,
@@ -502,7 +525,7 @@ const PharmacistSettings: React.FC<{ user: User }> = ({ user }) => {
   );
 };
 
-const LabTechnicianSettings: React.FC<{ user: User }> = ({ user }) => {
+const LabTechnicianSettings: React.FC<{ user: User }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [settings, setSettings] = useState({
     resultFormat: 'standard',
@@ -541,7 +564,7 @@ const LabTechnicianSettings: React.FC<{ user: User }> = ({ user }) => {
   );
 };
 
-const AdminSettings: React.FC<{ user: User }> = ({ user }) => {
+const AdminSettings: React.FC<{ user: User }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [settings, setSettings] = useState({
     auditLogRetention: '365',
@@ -592,7 +615,7 @@ const AdminSettings: React.FC<{ user: User }> = ({ user }) => {
   );
 };
 
-const ReceptionistSettings: React.FC<{ user: User }> = ({ user }) => {
+const ReceptionistSettings: React.FC<{ user: User }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [settings, setSettings] = useState({
     defaultCheckInTime: '15',
@@ -629,7 +652,7 @@ const ReceptionistSettings: React.FC<{ user: User }> = ({ user }) => {
   );
 };
 
-const LogisticsSettings: React.FC<{ user: User }> = ({ user }) => {
+const LogisticsSettings: React.FC<{ user: User }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [settings, setSettings] = useState({
     transportNotifications: true,
@@ -662,7 +685,7 @@ const LogisticsSettings: React.FC<{ user: User }> = ({ user }) => {
   );
 };
 
-const CommandCenterSettings: React.FC<{ user: User }> = ({ user }) => {
+const CommandCenterSettings: React.FC<{ user: User }> = ({ user: _user }) => {
   const { addToast } = useToasts();
   const [settings, setSettings] = useState({
     bedAlerts: true,

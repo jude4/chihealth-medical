@@ -49,6 +49,70 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSsoSuccess, onForgotPasswo
         };
     }, [view]); // Rerun when the view changes to attach the observer to the new form content
 
+    // Probe backend health to show a friendly warning if API proxy is down
+    const [backendHealthy, setBackendHealthy] = React.useState<boolean | null>(null);
+    useEffect(() => {
+        let mounted = true;
+
+        const probeHealth = async () => {
+                const timeoutMs = 2500;
+                const tryFetchWithTimeout = async (probeUrl: string) => {
+                    const controller = new AbortController();
+                    const id = setTimeout(() => controller.abort(), timeoutMs);
+                    try {
+                        const res = await fetch(probeUrl, { signal: controller.signal });
+                        clearTimeout(id);
+                        return res;
+                    } catch (err) {
+                        clearTimeout(id);
+                        throw err;
+                    }
+                };
+
+                // Candidate probe URLs (order matters): proxied path first, then configured backend, then origin
+                const candidates = [
+                    '/api/health',
+                    `${api.API_BASE_URL.replace(/\/$/, '')}/api/health`,
+                    `${window.location.origin}/api/health`,
+                ];
+
+                try {
+                    try { console.debug('Health probe candidates:', candidates); } catch (e) {}
+                    for (const url of candidates) {
+                        if (!mounted) return;
+                        try {
+                            try { console.debug('Probing', url); } catch (e) {}
+                            const res = await tryFetchWithTimeout(url);
+                            try { console.debug('Probe result for', url, res.status); } catch (e) {}
+
+                            // If the endpoint exists and returns 2xx, mark healthy and stop
+                            if (res && res.ok) {
+                                if (!mounted) return;
+                                setBackendHealthy(true);
+                                return;
+                            }
+
+                            // If 404 or other non-OK, try the next candidate instead of failing immediately
+                            try { console.debug('Probe not OK, status:', res.status, 'for', url); } catch (e) {}
+                            continue;
+                        } catch (err) {
+                            try { console.debug('Probe error for', url, err && (err as any).message); } catch (e) {}
+                            // network error or timeout -> try next candidate
+                            continue;
+                        }
+                    }
+
+                    // none of the candidates responded OK
+                    if (mounted) setBackendHealthy(false);
+                } catch (err) {
+                    if (mounted) setBackendHealthy(false);
+                }
+            };
+
+        probeHealth();
+        return () => { mounted = false; };
+    }, []);
+
     const handleSsoLogin = async (provider: 'Google') => {
         setIsSsoLoading(true);
         try {
@@ -74,6 +138,9 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSsoSuccess, onForgotPasswo
             </div>
 
             <div className="auth-form-wrapper" style={{ height: formHeight }}>
+                {backendHealthy === false && (
+                    <div className="text-sm text-red-600 mb-3">Connection issue: the backend API appears unreachable — some actions (register/login) may fail.</div>
+                )}
                 <div ref={formRef}>
                 {view === 'login' ? (
                     <LoginForm onForgotPassword={onForgotPassword} onAuthSuccess={onAuthSuccess} />

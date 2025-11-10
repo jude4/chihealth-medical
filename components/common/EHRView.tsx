@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Patient, LabTest, ClinicalNote, User, Prescription, Referral, CarePlan, CarePlanAdherence, DiagnosticSuggestion, LifestyleRecommendation, ReferralSuggestion } from '../../types.ts';
 import { Button } from './Button.tsx';
-import { SparklesIcon, TargetIcon, MicroscopeIcon, DietIcon, RepeatIcon } from '../icons/index.tsx';
+import { SparklesIcon, TargetIcon, MicroscopeIcon, DietIcon, RepeatIcon, DownloadCloudIcon } from '../icons/index.tsx';
 import { AISummaryModal } from './AISummaryModal.tsx';
 import * as geminiService from '../../services/geminiService.ts';
 import { ClinicalNoteModal } from '../hcw/ClinicalNoteModal.tsx';
@@ -90,9 +90,11 @@ export const EHRView: React.FC<EHRViewProps> = (props) => {
     setIsLoadingSummary(true);
     try {
       const result = await geminiService.generateEHRSummary(props.patient, props.clinicalNotes, props.labTests);
-      setSummary(result);
+  setSummary(result && result.length ? result : 'No summary could be generated.');
     } catch (e) {
-      setSummary("Failed to generate summary.");
+  const msg = (e && (e as any).message) ? (e as any).message : 'Failed to generate summary.';
+  setSummary(`Error: ${msg}`);
+  addToast(`AI Summary failed: ${msg}`, 'error');
     } finally {
       setIsLoadingSummary(false);
     }
@@ -235,15 +237,22 @@ export const EHRView: React.FC<EHRViewProps> = (props) => {
           <h2 className="text-3xl font-bold text-text-primary">Electronic Health Record</h2>
           <p className="text-text-secondary">Patient: {props.patient.name} (ID: {props.patient.id})</p>
         </div>
-        <div className="flex gap-2">
+        <div className="ehr-actions">
+          <div className="ehr-action-left">
             {props.onBack && <Button onClick={props.onBack}>&larr; Back to Patients</Button>}
-            <Button onClick={props.onDownload}>Download PDF</Button>
+          </div>
+          <div className="ehr-action-buttons">
+            <Button onClick={props.onDownload} aria-label="Download medical record PDF">
+              <DownloadCloudIcon className="w-5 h-5 mr-2" />
+              Download PDF
+            </Button>
             {canAccessFeature(props.currentUser, 'ai_summary') && (
-              <Button onClick={handleGenerateSummary} style={{backgroundColor: 'var(--violet-500)'}}>
+              <Button onClick={handleGenerateSummary} style={{ backgroundColor: 'var(--violet-500)', color: 'white' }}>
                 <SparklesIcon className="w-5 h-5 mr-2" />
                 AI Summary
               </Button>
             )}
+          </div>
         </div>
       </div>
       

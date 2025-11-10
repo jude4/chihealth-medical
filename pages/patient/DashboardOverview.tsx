@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Patient, Appointment, Prescription, WearableDataPoint, Message, User, CarePlan } from '../../types.ts';
 import { CalendarIcon, HeartPulseIcon, StepIcon, MoonIcon, SparklesIcon } from '../../components/icons/index.tsx';
+import { HealthChart } from '../../components/common/HealthChart.tsx';
 // Fix: Add .tsx extension to local module import.
 import { PatientView } from './PatientDashboard.tsx';
 import * as geminiService from '../../services/geminiService.ts';
@@ -54,31 +55,52 @@ const HealthVitals: React.FC<{ wearableData: WearableDataPoint[] | undefined }> 
     const data = wearableData || [];
     const latestData = data.length > 0 ? data[data.length - 1] : null;
     const lastNightData = data.find(d => new Date(d.timestamp).getDate() === new Date().getDate() - 1);
-    
+
+    // Prepare small sparkline data for heart rate & steps (last 7)
+    const hrPoints = data.slice(-7).map(d => ({ value: d.heartRate || 0, label: new Date(d.timestamp).toLocaleDateString() }));
+    const stepPoints = data.slice(-7).map(d => ({ value: d.steps || 0, label: new Date(d.timestamp).toLocaleDateString() }));
+
     return (
         <div className="content-card p-6">
             <h3 className="font-semibold text-lg text-text-primary mb-4">Health Vitals</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-red-500/10 rounded-full"><HeartPulseIcon className="w-6 h-6 text-red-500" /></div>
-                    <div>
-                        <p className="text-sm text-text-secondary">Heart Rate</p>
-                        <p className="text-xl font-bold text-text-primary">{latestData?.heartRate ?? '--'} <span className="text-sm font-normal">bpm</span></p>
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-red-500/10 rounded-full"><HeartPulseIcon className="w-6 h-6 text-red-500" /></div>
+                        <div>
+                            <p className="text-sm text-text-secondary">Heart Rate</p>
+                            <p className="text-xl font-bold text-text-primary">{latestData?.heartRate ?? '--'} <span className="text-sm font-normal">bpm</span></p>
+                        </div>
+                    </div>
+                    <div className="mt-2">
+                        <div style={{ height: '48px' }}><HealthChart data={hrPoints} color="#ef4444" unit="bpm" /></div>
+                        <p className="text-xs text-text-secondary mt-1">Last updated: {latestData ? new Date(latestData.timestamp).toLocaleString() : 'N/A'}</p>
                     </div>
                 </div>
-                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-sky-500/10 rounded-full"><StepIcon className="w-6 h-6 text-sky-500" /></div>
-                    <div>
-                        <p className="text-sm text-text-secondary">Steps Today</p>
-                        <p className="text-xl font-bold text-text-primary">{latestData?.steps?.toLocaleString() ?? '--'}</p>
+
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-sky-500/10 rounded-full"><StepIcon className="w-6 h-6 text-sky-500" /></div>
+                        <div>
+                            <p className="text-sm text-text-secondary">Steps Today</p>
+                            <p className="text-xl font-bold text-text-primary">{latestData?.steps?.toLocaleString() ?? '--'}</p>
+                        </div>
+                    </div>
+                    <div className="mt-2">
+                        <div style={{ height: '48px' }}><HealthChart data={stepPoints} color="#0284c7" unit="steps" /></div>
+                        <p className="text-xs text-text-secondary mt-1">Last updated: {latestData ? new Date(latestData.timestamp).toLocaleString() : 'N/A'}</p>
                     </div>
                 </div>
-                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-violet-500/10 rounded-full"><MoonIcon className="w-6 h-6 text-violet-500" /></div>
-                    <div>
-                        <p className="text-sm text-text-secondary">Last Sleep</p>
-                        <p className="text-xl font-bold text-text-primary">{lastNightData?.sleepHours ?? '--'} <span className="text-sm font-normal">hrs</span></p>
+
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-violet-500/10 rounded-full"><MoonIcon className="w-6 h-6 text-violet-500" /></div>
+                        <div>
+                            <p className="text-sm text-text-secondary">Last Sleep</p>
+                            <p className="text-xl font-bold text-text-primary">{lastNightData?.sleepHours ?? '--'} <span className="text-sm font-normal">hrs</span></p>
+                        </div>
                     </div>
+                    <p className="text-xs text-text-secondary mt-2">Recorded: {lastNightData ? new Date(lastNightData.timestamp).toLocaleString() : 'N/A'}</p>
                 </div>
             </div>
         </div>
@@ -149,6 +171,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = (props) => {
                             <p className="font-bold text-lg text-text-primary">{appointmentDateTime?.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
                             <p className="text-text-secondary text-sm">{props.t('with')} <span className="font-medium text-text-primary">{upcomingAppointment.doctorName}</span></p>
                             <p className="text-primary text-sm font-semibold">{upcomingAppointment.specialty}</p>
+                                {props.user.wearableDevices && props.user.wearableDevices.length > 0 && (
+                                    <div className="content-card p-4">
+                                        <h4 className="font-semibold text-lg mb-2">Connected Devices</h4>
+                                        <ul className="text-sm text-text-secondary">
+                                            {props.user.wearableDevices.slice(0,3).map(d => (
+                                                <li key={d.id}>{d.name} • {d.type}</li>
+                                            ))}
+                                            {props.user.wearableDevices.length > 3 && <li className="mt-2 text-xs">And {props.user.wearableDevices.length - 3} more...</li>}
+                                        </ul>
+                                    </div>
+                                )}
                         </div>
                     </div>
                 )}

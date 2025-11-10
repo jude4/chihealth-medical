@@ -4,6 +4,7 @@ import { Button } from '../../components/common/Button.tsx';
 import * as authService from '../../services/authService.ts';
 import * as api from '../../services/apiService.ts';
 import { User } from '../../types.ts';
+// KeyIcon removed from login form UI
 
 interface LoginFormProps {
     onForgotPassword: () => void;

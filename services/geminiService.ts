@@ -1,586 +1,159 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import {
-  Patient,
-  Appointment,
-  Prescription,
-  TriageSuggestion,
-  ClinicalNote,
-  LabTest,
-  PredictiveRiskResult,
-  CarePlan,
-  InpatientStay,
-  VitalTrendAlert,
-  PharmacySafetyCheckResult,
-  DiagnosticSuggestion,
-  LifestyleRecommendation,
-  ReferralSuggestion,
-} from "../types.ts";
+// Client-safe Gemini proxy wrapper
+// This module proxies AI prompts to the backend endpoint /api/ai/generate.
 
-// Use Vite's environment variable system (import.meta.env)
-// In Vite, environment variables must be prefixed with VITE_ to be exposed to the client
-const apiKey =
-  import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY || "";
-const ai = new GoogleGenAI({ apiKey });
 
-export const runChat = async (prompt: string): Promise<string> => {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: `You are a helpful AI assistant for a healthcare platform. The user is asking the following: "${prompt}". Provide a helpful but general response. IMPORTANT: Do not provide medical advice. Always recommend consulting a doctor for health concerns.`,
-  });
-  return response.text;
-};
+import { API_BASE_URL } from './apiService.ts';
+import type { VitalTrendAlert } from '../types';
 
-export const getTriageSuggestion = async (
-  symptoms: string
-): Promise<TriageSuggestion | null> => {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: `A patient reports the following symptoms: "${symptoms}". Based on these symptoms, suggest a medical specialty they should consult. Your response MUST be in JSON format. Do not add markdown backticks. The JSON should have three keys: "recommendation" (either "self-care" or "appointment"), "reasoning" (a brief explanation), and "specialty" (e.g., "Cardiology", "Dermatology", "General Practice"). If symptoms are very mild like 'a small scratch', recommend 'self-care'. For anything else, recommend 'appointment'.`,
-    config: {
-      responseMimeType: "application/json",
-    },
-  });
+export type RunModelPayload = { model: string; contents: string; config?: any };
 
-  try {
-    const jsonText = response.text.trim();
-    const suggestion = JSON.parse(jsonText);
-    // Basic validation
-    if (
-      suggestion.recommendation &&
-      suggestion.reasoning &&
-      suggestion.specialty
-    ) {
-      return suggestion as TriageSuggestion;
+async function callAiProxy(payload: RunModelPayload): Promise<string> {
+  const url = `${API_BASE_URL}/api/ai/generate`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000); // 15s timeout for AI
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout));
+
+  const raw = await res.text().catch(() => '');
+  if (!res.ok) {
+    let parsed: any = { message: 'AI server error' };
+    if (raw) {
+      try { parsed = JSON.parse(raw); } catch { parsed = { message: raw }; }
     }
-    return null;
-  } catch (e) {
-    console.error("Failed to parse triage suggestion JSON:", e);
-    return null;
+    throw new Error(parsed.error || parsed.message || 'AI server error');
   }
-};
 
-export const generateDailyBriefing = async (
-  patient: Patient,
-  appointments: Appointment[],
-  prescriptions: Prescription[]
-): Promise<string> => {
-  const upcomingAppointment = appointments.find(
-    (a) => new Date(a.date) >= new Date()
-  );
-
-  const prompt = `Generate a concise, friendly, and encouraging daily health briefing for a patient named ${
-    patient.name
-  }.
-  - Today's date is ${new Date().toDateString()}.
-  - They have an upcoming appointment: ${
-    upcomingAppointment
-      ? `${upcomingAppointment.specialty} with ${
-          upcomingAppointment.doctorName
-        } on ${new Date(upcomingAppointment.date).toDateString()}`
-      : "None scheduled"
-  }.
-  - Their active prescriptions are: ${
-    prescriptions.length > 0
-      ? prescriptions.map((p) => p.medication).join(", ")
-      : "None"
-  }.
-  - Their latest wearable data shows: Heart Rate: ${
-    patient.wearableData?.[patient.wearableData.length - 1]?.heartRate
-  } bpm, Steps: ${
-    patient.wearableData?.[patient.wearableData.length - 1]?.steps
-  } steps.
-
-  Format the output as simple markdown. Start with a greeting. If there's an appointment, remind them. If they have prescriptions, gently remind them to take their medication. Briefly comment on their activity level based on steps. Keep it under 80 words.`;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
-  return response.text;
-};
-
-export const generateEHRSummary = async (
-  patient: Patient,
-  notes: ClinicalNote[],
-  labs: LabTest[]
-): Promise<string> => {
-  const prompt = `
-        Summarize the Electronic Health Record for patient ${
-          patient.name
-        }, born ${patient.dateOfBirth}.
-        This is for a clinician's quick review. Be concise and use bullet points.
-        
-        Recent Clinical Notes:
-        ${notes
-          .map(
-            (n) =>
-              `- ${n.date}: Dr. ${n.doctorName} noted: "${n.content.substring(
-                0,
-                100
-              )}..."`
-          )
-          .join("\n")}
-        
-        Recent Lab Results:
-        ${labs
-          .map(
-            (l) =>
-              `- ${l.dateOrdered}: ${l.testName} - Result: ${
-                l.result || l.status
-              }`
-          )
-          .join("\n")}
-        
-        Generate a summary covering major points, recent diagnoses, and outstanding results.
-        Format the output using simple markdown with bolding for headers.
-    `;
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
-  return response.text;
-};
-
-export const getPredictiveRiskAnalysis = async (
-  patient: Patient,
-  notes: ClinicalNote[],
-  labs: LabTest[]
-): Promise<PredictiveRiskResult[]> => {
-  const prompt = `Analyze the provided patient data to generate a predictive risk stratification for common chronic conditions.
-    Patient: ${patient.name}, DOB: ${patient.dateOfBirth}.
-    Key Clinical Notes: ${notes
-      .slice(0, 2)
-      .map((n) => n.content)
-      .join("; ")}
-    Key Lab Results: ${labs
-      .slice(0, 2)
-      .map((l) => `${l.testName}: ${l.result}`)
-      .join("; ")}
-
-    Return a JSON array with exactly two objects, one for 'Diabetes' and one for 'Hypertension'.
-    Each object must have these keys:
-    - "condition": string (e.g., "Diabetes")
-    - "riskScore": number (a score from 0 to 100)
-    - "riskLevel": string ("Low", "Medium", or "High")
-    - "justification": string (a brief, one-sentence explanation for the score based on the data).
-    
-    Do not include markdown backticks in your response.`;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
-  });
-
-  try {
-    const jsonText = response.text.trim();
-    return JSON.parse(jsonText) as PredictiveRiskResult[];
-  } catch (e) {
-    console.error("Failed to parse risk analysis JSON", e);
-    // Return a fallback if parsing fails
-    return [
-      {
-        condition: "Diabetes",
-        riskScore: 0,
-        riskLevel: "Low",
-        justification: "Error processing data.",
-      },
-      {
-        condition: "Hypertension",
-        riskScore: 0,
-        riskLevel: "Low",
-        justification: "Error processing data.",
-      },
-    ];
+  if (!raw) return '';
+  try { const json = JSON.parse(raw); return (json.text ?? json.output ?? '') as string; } catch { 
+    // If backend returned raw text (dev stub), return it as-is.
+    return raw;
   }
-};
+}
 
-export const generateProactiveCarePlan = async (
-  patient: Patient,
-  notes: ClinicalNote[],
-  labs: LabTest[]
-): Promise<CarePlan> => {
-  const prompt = `
-    Based on the patient's full medical record, create a proactive and personalized care plan.
-    Patient: ${patient.name}, DOB: ${patient.dateOfBirth}.
-    Recent Notes: ${notes
-      .slice(-2)
-      .map((n) => n.content)
-      .join("; ")}
-    Recent Labs: ${labs
-      .slice(-2)
-      .map((l) => `${l.testName}: ${l.result || l.status}`)
-      .join("; ")}
+function sanitizeAiText(text: string) {
+  if (!text) return text;
+  // Strip dev stub prefix like: (dev AI) Response for model=...\n\n
+  const stripped = text.replace(/^\(dev AI\)[\s\S]*?\n\n/, '');
+  return stripped.trim();
+}
 
-    Generate a JSON object that follows the specified schema. Do not include markdown backticks.
-    The plan should be comprehensive, actionable, and preventative. Base your suggestions on the provided data.
-    `;
+export const runModel = async (payload: RunModelPayload) => callAiProxy(payload);
+export const runChat = async (prompt: string) => runModel({ model: 'gemini-2.5-flash', contents: prompt });
+export const getTriageSuggestion = async (symptoms: string) => runModel({ model: 'gemini-2.5-flash', contents: symptoms });
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          lifestyleRecommendations: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                category: { type: Type.STRING },
-                recommendation: { type: Type.STRING },
-                details: { type: Type.STRING },
-              },
-              required: ["category", "recommendation", "details"],
-            },
-          },
-          monitoringSuggestions: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                parameter: { type: Type.STRING },
-                frequency: { type: Type.STRING },
-                notes: { type: Type.STRING },
-              },
-              required: ["parameter", "frequency", "notes"],
-            },
-          },
-          followUpAppointments: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                specialty: { type: Type.STRING },
-                timeframe: { type: Type.STRING },
-                reason: { type: Type.STRING },
-              },
-              required: ["specialty", "timeframe", "reason"],
-            },
-          },
-          diagnosticSuggestions: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                testName: { type: Type.STRING },
-                reason: { type: Type.STRING },
-              },
-              required: ["testName", "reason"],
-            },
-          },
-        },
-        required: [
-          "lifestyleRecommendations",
-          "monitoringSuggestions",
-          "followUpAppointments",
-        ],
-      },
-    },
-  });
-
-  const jsonText = response.text.trim();
-  return JSON.parse(jsonText) as CarePlan;
-};
-
-export const generateDiagnosticSuggestions = async (
-  patient: Patient,
-  notes: ClinicalNote[],
-  labs: LabTest[]
-): Promise<DiagnosticSuggestion[]> => {
-  const prompt = `Based on the patient's record, suggest relevant diagnostic tests.
-    Patient: ${patient.name}, DOB: ${patient.dateOfBirth}.
-    Recent Notes: ${notes
-      .slice(-2)
-      .map((n) => n.content)
-      .join("; ")}
-    Recent Labs: ${labs
-      .slice(-2)
-      .map((l) => `${l.testName}: ${l.result || l.status}`)
-      .join("; ")}
-    
-    Return a JSON array of objects. Each object should have two keys: "testName" (string) and "reason" (string, a brief clinical justification).
-    Suggest 1 to 3 relevant tests. If no tests seem necessary, return an empty array.
-    Do not include markdown backticks.`;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            testName: { type: Type.STRING },
-            reason: { type: Type.STRING },
-          },
-          required: ["testName", "reason"],
-        },
-      },
-    },
-  });
-  const jsonText = response.text.trim();
-  return JSON.parse(jsonText) as DiagnosticSuggestion[];
-};
-
-export const generateLifestylePlan = async (
-  patient: Patient,
-  notes: ClinicalNote[],
-  labs: LabTest[]
-): Promise<LifestyleRecommendation[]> => {
-  const prompt = `Based on the patient's record, create a personalized lifestyle and diet plan.
-    Patient: ${patient.name}, DOB: ${patient.dateOfBirth}.
-    Recent Notes: ${notes
-      .slice(-2)
-      .map((n) => n.content)
-      .join("; ")}
-    Recent Labs: ${labs
-      .slice(-2)
-      .map((l) => `${l.testName}: ${l.result || l.status}`)
-      .join("; ")}
-
-    Return a JSON array of objects. Each object must have "category" ('Diet' or 'Exercise'), "recommendation" (a specific goal), and "details" (actionable advice).
-    Provide at least one diet and one exercise recommendation.
-    Do not include markdown backticks.`;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            category: { type: Type.STRING },
-            recommendation: { type: Type.STRING },
-            details: { type: Type.STRING },
-          },
-          required: ["category", "recommendation", "details"],
-        },
-      },
-    },
-  });
-  const jsonText = response.text.trim();
-  return JSON.parse(jsonText) as LifestyleRecommendation[];
-};
-
-export const generateReferralSuggestion = async (
-  patient: Patient,
-  notes: ClinicalNote[],
-  labs: LabTest[]
-): Promise<ReferralSuggestion> => {
-  const prompt = `Analyze the patient's record and suggest a specialty for referral if one seems appropriate.
-    Patient: ${patient.name}, DOB: ${patient.dateOfBirth}.
-    Recent Notes: ${notes
-      .slice(-2)
-      .map((n) => n.content)
-      .join("; ")}
-    Recent Labs: ${labs
-      .slice(-2)
-      .map((l) => `${l.testName}: ${l.result || l.status}`)
-      .join("; ")}
-
-    Return a JSON object with two keys: "specialty" (e.g., "Cardiology", "Endocrinology") and "reason" (a brief clinical justification).
-    If no referral seems necessary, suggest "General Practice" for a routine follow-up.
-    Do not include markdown backticks.`;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          specialty: { type: Type.STRING },
-          reason: { type: Type.STRING },
-        },
-        required: ["specialty", "reason"],
-      },
-    },
-  });
-  const jsonText = response.text.trim();
-  return JSON.parse(jsonText) as ReferralSuggestion;
-};
-
-export const generateCoachingMessage = async (
-  patient: Patient,
-  carePlan: CarePlan
-): Promise<string> => {
-  const dietGoal = carePlan.lifestyleRecommendations.find(
-    (r) => r.category === "Diet"
-  )?.recommendation;
-  const exerciseGoal = carePlan.lifestyleRecommendations.find(
-    (r) => r.category === "Exercise"
-  )?.recommendation;
-
-  const prompt = `
-    Generate a short, single-paragraph, encouraging coaching message for ${patient.name}.
-    The message should be friendly and motivational, based on their care plan.
-    - Their dietary goal is: "${dietGoal}".
-    - Their exercise goal is: "${exerciseGoal}".
-    Pick one of these goals and provide a gentle reminder or a positive tip.
-    Do not sound robotic. Keep it under 50 words. Use simple markdown.
-    `;
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
-  return response.text;
-};
-
-export const generateNoteFromTranscript = async (
-  transcript: string
-): Promise<string> => {
-  const prompt = `
-    Given the following transcript from a doctor-patient telemedicine call, generate a clinical note in SOAP format.
-    The note should be professional, concise, and accurately reflect the conversation.
-    
-    Transcript:
-    "${transcript}"
-
-    Format the output as a single block of text, using markdown for headers (e.g., **Subjective:**, **Objective:**, **Assessment:**, **Plan:**).
-    `;
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
-  return response.text;
-};
-
-export const generateAiChannelResponse = async (
-  command: string,
-  patient: Patient,
-  notes: ClinicalNote[],
-  labs: LabTest[]
-): Promise<string> => {
-  let contextData = "";
-  let query = "";
-
-  if (
-    command.toLowerCase().includes("summarize") ||
-    command.toLowerCase().includes("summary")
-  ) {
-    contextData = `Notes: ${notes
-      .slice(-1)
-      .map((n) => n.content)
-      .join(". ")}. Labs: ${labs
-      .slice(-1)
-      .map((l) => `${l.testName}: ${l.result}`)
-      .join(". ")}.`;
-    query = `Provide a very brief one-sentence summary of the patient's latest status based on the following: ${contextData}`;
-  } else if (command.toLowerCase().includes("last note")) {
-    contextData =
-      notes.length > 0
-        ? notes[notes.length - 1].content
-        : "No notes available.";
-    query = `Summarize this clinical note in one sentence: "${contextData}"`;
-  } else if (
-    command.toLowerCase().includes("last labs") ||
-    command.toLowerCase().includes("cbc")
-  ) {
-    contextData =
-      labs.length > 0
-        ? labs
-            .filter((l) => l.result)
-            .map((l) => `${l.testName}: ${l.result}`)
-            .join(", ")
-        : "No lab results available.";
-    query = `What are the latest lab results? Here is the data: ${contextData}`;
+export async function generateEHRSummary(a: any, b?: any, c?: any) {
+  let prompt: string;
+  if (typeof a === 'string' && b === undefined && c === undefined) {
+    prompt = a;
   } else {
-    return "I can help with 'summarize', 'last note', or 'last labs'. Please try one of those.";
+    const patient = a;
+    const clinicalNotes = Array.isArray(b) ? b : [];
+    const labTests = Array.isArray(c) ? c : [];
+    prompt = `Please write a concise EHR summary for the following patient record. Patient:\n${JSON.stringify(patient, null, 2)}\n\nClinical Notes:\n${JSON.stringify(clinicalNotes, null, 2)}\n\nLab Tests:\n${JSON.stringify(labTests, null, 2)}\n\nReturn a short, structured summary suitable for providers.`;
   }
+  const text = await runModel({ model: 'gemini-2.5-flash', contents: prompt });
+  return text;
+}
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: query,
-  });
-
-  return response.text;
+export const generateDailyBriefing = async (briefingPrompt: string | any, appointments?: any, prescriptions?: any) => {
+  // If caller passed structured data, build a prompt; otherwise treat as raw prompt string.
+  let prompt: string;
+  if (typeof briefingPrompt === 'string' && appointments === undefined && prescriptions === undefined) {
+    prompt = briefingPrompt;
+  } else {
+    const patient = briefingPrompt;
+    prompt = `Daily briefing for patient ${patient?.name || ''} with appointments: ${JSON.stringify(appointments || [])} and prescriptions: ${JSON.stringify(prescriptions || [])}`;
+  }
+  return runModel({ model: 'gemini-2.5-flash', contents: prompt });
 };
 
-export const checkForVitalAnomalies = async (
-  vitalHistory: InpatientStay["vitalHistory"]
-): Promise<VitalTrendAlert | null> => {
-  const prompt = `
-    Analyze this series of recent vital signs for an inpatient. The data is ordered from oldest to newest.
-    Data: ${JSON.stringify(vitalHistory.slice(-5))}
-    
-    Identify if there are any clinically concerning trends (e.g., consistent drop in SpO2, sudden spike in heart rate).
-    
-    If a concerning trend is detected, return a JSON object with the following keys:
-    - "alertType": "critical" or "warning"
-    - "summary": A very short summary of the issue (e.g., "SpO2 Declining").
-    - "details": A one-sentence explanation of the trend (e.g., "Patient's oxygen saturation has dropped by 3% over the last 15 minutes.").
-    
-    If there are no concerning trends, return the string "null".
-    Do not include markdown backticks in your response.
-    `;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
+export async function checkForVitalAnomalies(vitals: any[]): Promise<VitalTrendAlert | null> {
+  // Lightweight local heuristic for demo: flag if any vitals outside expected ranges
+  if (!Array.isArray(vitals) || vitals.length === 0) return null;
+  const issues: string[] = [];
+  vitals.forEach(v => {
+    const spO2 = v.spO2 ?? v.spo2 ?? v.sp_o2;
+    if (v.heartRate && (v.heartRate < 40 || v.heartRate > 130)) issues.push(`Abnormal heart rate: ${v.heartRate}`);
+    if (typeof spO2 === 'number' && spO2 < 90) issues.push(`Low SpO2: ${spO2}`);
+    if (v.steps && v.steps > 100000) issues.push(`Suspicious step count: ${v.steps}`);
   });
 
-  const text = response.text.trim();
-  if (text === "null") {
-    return null;
+  if (issues.length === 0) return null;
+
+  const severity = issues.some(i => /Abnormal|Low|Suspicious/i.test(i)) ? 'critical' : 'warning';
+  const summary = severity === 'critical' ? 'Critical vital sign anomalies detected' : 'Vital sign anomalies detected';
+  return {
+    alertType: severity as 'critical' | 'warning',
+    summary,
+    details: issues.join('; '),
+  } as VitalTrendAlert;
+}
+
+export async function generateAiChannelResponse(command: string, patient: any, patientNotes: any[], patientLabs: any[]) {
+  const prompt = `You are a clinical assistant.\nCommand: ${command}\n\nPatient:\n${JSON.stringify(patient, null, 2)}\n\nRecent notes:\n${JSON.stringify(patientNotes, null, 2)}\n\nRecent labs:\n${JSON.stringify(patientLabs, null, 2)}\n\nProvide a concise, helpful response suitable for insertion into the messaging channel.`;
+  return await runModel({ model: 'gemini-2.5-flash', contents: prompt });
+}
+
+export async function runPharmacySafetyCheck(medication: string, existingMedications: string[]) {
+  const prompt = `You are a pharmacist safety check assistant. Analyze the following medication for potential interactions, duplications, or contraindications with the patient's current medication list.\n\nMedication under review: ${medication}\n\nCurrent medications: ${existingMedications.length ? existingMedications.join(', ') : '(none)'}\n\nReturn a short JSON object with keys:\n- issues: array of strings describing any problems\n- severity: one of "ok", "caution", "high"\n- advice: a concise suggestion for the pharmacist.`;
+  const text = await runModel({ model: 'gemini-2.5-flash', contents: prompt });
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+export async function generateProactiveCarePlan(patient: any, clinicalNotes: any[], labTests: any[]) {
+  const prompt = `Generate a comprehensive proactive care plan for the patient. Patient:\n${JSON.stringify(patient, null, 2)}\n\nClinical notes:\n${JSON.stringify(clinicalNotes, null, 2)}\n\nLab tests:\n${JSON.stringify(labTests, null, 2)}\n\nReturn a JSON object summarizing recommended monitoring, lifestyle changes, follow-ups, and medication suggestions.`;
+  const text = await runModel({ model: 'gemini-2.5-flash', contents: prompt });
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+export async function generateDiagnosticSuggestions(patient: any, clinicalNotes: any[], labTests: any[]) {
+  const prompt = `Based on the patient record below, suggest likely diagnostic tests or imaging to consider. Patient:\n${JSON.stringify(patient, null, 2)}\n\nClinical notes:\n${JSON.stringify(clinicalNotes, null, 2)}\n\nLab tests:\n${JSON.stringify(labTests, null, 2)}\n\nReturn a JSON array of suggestions with brief rationale.`;
+  const text = await runModel({ model: 'gemini-2.5-flash', contents: prompt });
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+export async function generateLifestylePlan(patient: any, clinicalNotes: any[], labTests: any[]) {
+  const prompt = `Create a concise lifestyle and diet recommendation for this patient based on their record. Patient:\n${JSON.stringify(patient, null, 2)}\n\nClinical notes:\n${JSON.stringify(clinicalNotes, null, 2)}\n\nLab tests:\n${JSON.stringify(labTests, null, 2)}\n\nReturn a JSON array of recommendations.`;
+  const text = await runModel({ model: 'gemini-2.5-flash', contents: prompt });
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+export async function generateReferralSuggestion(patient: any, clinicalNotes: any[], labTests: any[]) {
+  const prompt = `Recommend specialty referral options for this patient based on the record. Patient:\n${JSON.stringify(patient, null, 2)}\n\nClinical notes:\n${JSON.stringify(clinicalNotes, null, 2)}\n\nLab tests:\n${JSON.stringify(labTests, null, 2)}\n\nReturn a short JSON object with recommended specialties and rationale.`;
+  const text = await runModel({ model: 'gemini-2.5-flash', contents: prompt });
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+export async function generateCoachingMessage(patient: any, carePlan: any) {
+  const prompt = `You are a friendly health coach. Given the patient record:\n${JSON.stringify(patient, null, 2)}\n\nAnd the care plan:\n${JSON.stringify(carePlan, null, 2)}\n\nProduce a short, encouraging coaching message (1-3 sentences) focused on adherence and simple actionable steps.`;
+  const raw = await runModel({ model: 'gemini-2.5-flash', contents: prompt });
+  const cleaned = sanitizeAiText(raw);
+
+  // If the dev stub simply echoed the prompt or returned JSON, fall back to a simple local message
+  const looksLikeJsonEcho = /^\s*\{/.test(cleaned) || cleaned.includes(JSON.stringify(patient).slice(0, 40));
+  if (looksLikeJsonEcho) {
+    const name = patient?.name ? String(patient.name).split(' ')[0] : 'there';
+    return `Hi ${name}, small steps make a big difference — follow your care plan, take medications as prescribed, and contact your care team if you notice any new or worsening symptoms.`;
   }
-  try {
-    return JSON.parse(text) as VitalTrendAlert;
-  } catch (e) {
-    console.error("Failed to parse vital alert JSON", e);
-    return null;
-  }
-};
 
-export const runPharmacySafetyCheck = async (
-  newMedication: string,
-  existingMedications: string[]
-): Promise<PharmacySafetyCheckResult> => {
-  const prompt = `
-    A pharmacist is dispensing a new medication. Check for potential drug-to-drug interactions.
-    New Medication: "${newMedication}"
-    Patient's Existing Active Medications: ${JSON.stringify(
-      existingMedications
-    )}
+  return cleaned;
+}
 
-    Analyze for interactions. Respond with a JSON object. Do not use markdown backticks.
-    
-    If there is a significant interaction:
-    - "status": "warn"
-    - "interactionSeverity": "Low", "Medium", or "High"
-    - "interactionDetails": "Explain the specific interaction (e.g., 'Lisinopril and Potassium Chloride can lead to hyperkalemia.')."
-    - "recommendation": "Suggest a clinical action (e.g., 'Monitor serum potassium levels.' or 'Consult with prescriber before dispensing.')."
-
-    If there are no significant interactions:
-    - "status": "pass"
-    `;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          status: { type: Type.STRING },
-          interactionSeverity: { type: Type.STRING },
-          interactionDetails: { type: Type.STRING },
-          recommendation: { type: Type.STRING },
-        },
-        required: ["status"],
-      },
-    },
-  });
-
-  const jsonText = response.text.trim();
-  return JSON.parse(jsonText) as PharmacySafetyCheckResult;
+export default {
+  runModel,
+  runChat,
+  getTriageSuggestion,
+  generateEHRSummary,
+  generateDailyBriefing,
+  generateAiChannelResponse,
+  runPharmacySafetyCheck,
+  generateProactiveCarePlan,
+  generateDiagnosticSuggestions,
+  generateLifestylePlan,
+  generateReferralSuggestion,
+  generateCoachingMessage,
 };
