@@ -55,12 +55,16 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSsoSuccess: _onSsoSuccess,
         let mounted = true;
 
         const probeHealth = async () => {
-                const timeoutMs = 2500;
+                const timeoutMs = 3000; // Increased timeout
                 const tryFetchWithTimeout = async (probeUrl: string) => {
                     const controller = new AbortController();
                     const id = setTimeout(() => controller.abort(), timeoutMs);
                     try {
-                        const res = await fetch(probeUrl, { signal: controller.signal });
+                        const res = await fetch(probeUrl, { 
+                            signal: controller.signal,
+                            mode: 'cors',
+                            credentials: 'omit'
+                        });
                         clearTimeout(id);
                         return res;
                     } catch (err) {
@@ -85,14 +89,12 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSsoSuccess: _onSsoSuccess,
                     ...loopbackCandidates
                 ].filter((value, index, self) => self.indexOf(value) === index);
 
+                let lastError: Error | null = null;
                 try {
-                    try { console.debug('Health probe candidates:', candidates); } catch (e) {}
                     for (const url of candidates) {
                         if (!mounted) return;
                         try {
-                            try { console.debug('Probing', url); } catch (e) {}
                             const res = await tryFetchWithTimeout(url);
-                            try { console.debug('Probe result for', url, res.status); } catch (e) {}
 
                             // If the endpoint exists and returns 2xx, mark healthy and stop
                             if (res && res.ok) {
@@ -102,24 +104,56 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSsoSuccess: _onSsoSuccess,
                             }
 
                             // If 404 or other non-OK, try the next candidate instead of failing immediately
-                            try { console.debug('Probe not OK, status:', res.status, 'for', url); } catch (e) {}
                             continue;
                         } catch (err) {
-                            try { console.debug('Probe error for', url, err && (err as any).message); } catch (e) {}
+                            // Track the last error but continue trying other candidates
+                            lastError = err as Error;
                             // network error or timeout -> try next candidate
                             continue;
                         }
                     }
 
-                    // none of the candidates responded OK
-                    if (mounted) setBackendHealthy(false);
+                    // Only mark as unhealthy if we got network errors (not just 404s)
+                    // This prevents false positives when the health endpoint doesn't exist but backend is running
+                    if (mounted && lastError) {
+                        // Check if it's a real network error (not just a 404)
+                        const isNetworkError = lastError.name === 'AbortError' || 
+                                             lastError.message.includes('fetch') ||
+                                             lastError.message.includes('Failed to fetch') ||
+                                             lastError.message.includes('NetworkError');
+                        if (isNetworkError) {
+                            setBackendHealthy(false);
+                        } else {
+                            // If we got here but no network errors, backend might be reachable
+                            // Set to null (unknown) rather than false to avoid false warnings
+                            setBackendHealthy(null);
+                        }
+                    } else if (mounted) {
+                        // No errors but no successful response - set to null (unknown)
+                        setBackendHealthy(null);
+                    }
                 } catch (err) {
-                    if (mounted) setBackendHealthy(false);
+                    // Only set to false if we have a clear network error
+                    if (mounted) {
+                        const error = err as Error;
+                        if (error.message.includes('fetch') || error.name === 'TypeError') {
+                            setBackendHealthy(false);
+                        } else {
+                            setBackendHealthy(null);
+                        }
+                    }
                 }
             };
 
-        probeHealth();
-        return () => { mounted = false; };
+        // Delay the health check slightly to avoid race conditions on page load
+        const timeoutId = setTimeout(() => {
+            probeHealth();
+        }, 500);
+
+        return () => { 
+            mounted = false;
+            clearTimeout(timeoutId);
+        };
     }, []);
 
     const handleSsoLogin = async (provider: 'Google') => {
@@ -148,7 +182,11 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSsoSuccess: _onSsoSuccess,
 
             <div className="auth-form-wrapper" style={{ height: formHeight }}>
                 {backendHealthy === false && (
-                    <div className="text-sm text-red-600 mb-3">Connection issue: the backend API appears unreachable — some actions (register/login) may fail.</div>
+                    <div className="text-sm text-red-600 mb-3 p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+                        <strong>Connection issue:</strong> The backend API appears unreachable. Please ensure the backend server is running on port 8080.
+                        <br />
+                        <small className="text-xs mt-1 block">You can start it with: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">npm run dev:backend</code> or <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">npm run dev:all</code></small>
+                    </div>
                 )}
                 <div ref={formRef}>
                 {view === 'login' ? (

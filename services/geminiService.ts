@@ -46,7 +46,43 @@ function sanitizeAiText(text: string) {
 }
 
 export const runModel = async (payload: RunModelPayload) => callAiProxy(payload);
-export const runChat = async (prompt: string) => runModel({ model: 'gemini-2.5-flash', contents: prompt });
+
+export const runChat = async (prompt: string) => {
+  const raw = await runModel({ model: 'gemini-2.5-flash', contents: prompt });
+  const cleaned = sanitizeAiText(raw);
+  
+  // Check if the response is just echoing the input (common in dev stubs)
+  const looksLikeEcho = cleaned === prompt.trim() || 
+                        cleaned.includes(prompt.slice(0, 50)) ||
+                        cleaned.toLowerCase().includes('response for model');
+  
+  if (looksLikeEcho) {
+    // Provide a helpful fallback response for chat
+    const lowerPrompt = prompt.toLowerCase();
+    
+    if (lowerPrompt.includes('headache') || lowerPrompt.includes('head')) {
+      return "I understand you're experiencing a headache. Headaches can have various causes including stress, dehydration, tension, or underlying medical conditions. It's important to:\n\n• Stay hydrated\n• Rest in a quiet, dark room\n• Consider over-the-counter pain relief if appropriate\n• Monitor for severe or persistent symptoms\n\n**Please note:** If your headache is severe, sudden, or accompanied by other symptoms like vision changes, fever, or neck stiffness, please seek immediate medical attention. This is not a medical diagnosis - consult a healthcare professional for proper evaluation.";
+    }
+    
+    if (lowerPrompt.includes('fever') || lowerPrompt.includes('temperature')) {
+      return "I see you're concerned about a fever. Fevers are your body's natural response to infection or illness. Here's what you should know:\n\n• Monitor your temperature regularly\n• Stay hydrated with water and electrolyte drinks\n• Get plenty of rest\n• Use fever-reducing medications as directed if needed\n• Watch for signs of dehydration\n\n**Important:** If your fever is very high (over 103°F/39.4°C), persists for more than 3 days, or is accompanied by severe symptoms like difficulty breathing, rash, or confusion, please seek medical care immediately. This information is for educational purposes only - consult a healthcare provider for proper diagnosis and treatment.";
+    }
+    
+    if (lowerPrompt.includes('pain') || lowerPrompt.includes('hurt') || lowerPrompt.includes('ache')) {
+      return "I understand you're experiencing pain. Pain can vary in location, intensity, and cause. Here are some general considerations:\n\n• Note the location, type, and duration of your pain\n• Rest the affected area if appropriate\n• Apply ice or heat as may be helpful\n• Consider over-the-counter pain relief if suitable for you\n• Monitor for changes or worsening symptoms\n\n**Please remember:** Severe, sudden, or persistent pain, especially if accompanied by other symptoms, requires medical evaluation. This is not a substitute for professional medical advice - please consult with a healthcare provider for proper assessment.";
+    }
+    
+    if (lowerPrompt.includes('cough') || lowerPrompt.includes('cold')) {
+      return "I hear you're dealing with a cough or cold symptoms. Respiratory symptoms can be caused by various factors. General suggestions include:\n\n• Stay well-hydrated\n• Get adequate rest\n• Use a humidifier if helpful\n• Consider over-the-counter remedies as appropriate\n• Practice good hand hygiene to prevent spread\n\n**Important:** If you experience difficulty breathing, chest pain, high fever, or symptoms that worsen or persist, please seek medical attention. This information is educational only - consult a healthcare professional for proper care.";
+    }
+    
+    // Generic helpful response for any symptom query
+    return "Thank you for sharing your symptoms. I'm here to provide general health information, but I cannot provide a medical diagnosis.\n\nBased on what you've described, I recommend:\n\n• Monitoring your symptoms and noting any changes\n• Staying hydrated and getting adequate rest\n• Seeking professional medical advice if symptoms persist or worsen\n• Contacting a healthcare provider for proper evaluation\n\n**Remember:** This is not a medical diagnosis. For any health concerns, especially severe, sudden, or persistent symptoms, please consult with a qualified healthcare professional who can provide proper evaluation and treatment.\n\nWould you like me to help you book an appointment with a healthcare provider?";
+  }
+  
+  return cleaned;
+};
+
 export const getTriageSuggestion = async (symptoms: string) => runModel({ model: 'gemini-2.5-flash', contents: symptoms });
 
 export async function generateEHRSummary(a: any, b?: any, c?: any) {

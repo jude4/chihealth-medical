@@ -1,16 +1,34 @@
-
-
-import React, { useMemo, useState, useEffect } from 'react';
-import { Patient, Appointment, Prescription, WearableDataPoint, Message, User, CarePlan } from '../../types.ts';
-import { CalendarIcon, HeartPulseIcon, StepIcon, MoonIcon, SparklesIcon } from '../../components/icons/index.tsx';
-import { HealthChart } from '../../components/common/HealthChart.tsx';
+import React, { useMemo, useState, useEffect } from "react";
+import {
+  Patient,
+  Appointment,
+  Prescription,
+  WearableDataPoint,
+  Message,
+  User,
+  CarePlan,
+} from "../../types.ts";
+import {
+  CalendarIcon,
+  HeartIcon,
+  ActivityIcon,
+  BedIcon,
+  SparklesIcon,
+  ArrowRightIcon,
+  ClockIcon,
+  UserIcon,
+  MessageSquareIcon,
+  FileTextIcon,
+} from "../../components/icons/index.tsx";
+// HealthChart is commented out for now
+// import { HealthChart } from "../../components/common/HealthChart.tsx";
 // Fix: Add .tsx extension to local module import.
-import { PatientView } from './PatientDashboard.tsx';
-import * as geminiService from '../../services/geminiService.ts';
-import { MarkdownRenderer } from '../../components/common/MarkdownRenderer.tsx';
-import { MiniSymptomChecker } from '../../components/patient/MiniSymptomChecker.tsx';
-import { RecentMessages } from '../../components/patient/RecentMessages.tsx';
-import { CoachingCorner } from '../../components/patient/CoachingCorner.tsx';
+import { PatientView } from "./PatientDashboard.tsx";
+import * as geminiService from "../../services/geminiService.ts";
+import { MarkdownRenderer } from "../../components/common/MarkdownRenderer.tsx";
+import { MiniSymptomChecker } from "../../components/patient/MiniSymptomChecker.tsx";
+import { RecentMessages } from "../../components/patient/RecentMessages.tsx";
+import { CoachingCorner } from "../../components/patient/CoachingCorner.tsx";
 
 interface DashboardOverviewProps {
   user: Patient;
@@ -24,175 +42,376 @@ interface DashboardOverviewProps {
 }
 
 const getGreeting = (t: (key: string) => string): string => {
-    const hour = new Date().getHours();
-    if (hour < 12) return t('goodMorning');
-    if (hour < 18) return t('goodAfternoon');
-    return t('goodEvening');
-}
+  const hour = new Date().getHours();
+  if (hour < 12) return t("goodMorning");
+  if (hour < 18) return t("goodAfternoon");
+  return t("goodEvening");
+};
 
-const AIBriefingCard: React.FC<{ briefing: string; isLoading: boolean }> = ({ briefing, isLoading }) => (
-  <div className="ai-insight-card">
-    <div className="ai-insight-card-icon">
-      <SparklesIcon />
-    </div>
-    <div className="flex-1">
-      <h3 className="ai-insight-card-title">AI Daily Briefing</h3>
-      {isLoading ? (
-        <div className="ai-insight-loading">
-          <div className="ai-insight-loader-bar w-3/4"></div>
-          <div className="ai-insight-loader-bar w-1/2"></div>
+const AIBriefingCard: React.FC<{ briefing: string; isLoading: boolean }> = ({
+  briefing,
+  isLoading,
+}) => (
+  <div className="modern-card ai-briefing-modern">
+    <div className="flex items-start gap-4">
+      <div className="ai-icon-wrapper">
+        <SparklesIcon className="w-5 h-5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="modern-card-title">AI Daily Briefing</h3>
+          <span className="ai-badge">AI</span>
         </div>
-      ) : (
-        <div className="ai-insight-card-content">
-          <MarkdownRenderer content={briefing} />
-        </div>
-      )}
+        {isLoading ? (
+          <div className="ai-insight-loading">
+            <div className="ai-insight-loader-bar w-3/4"></div>
+            <div className="ai-insight-loader-bar w-1/2"></div>
+          </div>
+        ) : (
+          <div className="ai-briefing-content">
+            <MarkdownRenderer content={briefing} />
+          </div>
+        )}
+      </div>
     </div>
   </div>
 );
 
-const HealthVitals: React.FC<{ wearableData: WearableDataPoint[] | undefined }> = ({ wearableData }) => {
-    const data = wearableData || [];
-    const latestData = data.length > 0 ? data[data.length - 1] : null;
-    const lastNightData = data.find(d => new Date(d.timestamp).getDate() === new Date().getDate() - 1);
+const HealthVitals: React.FC<{
+  wearableData: WearableDataPoint[] | undefined;
+}> = ({ wearableData }) => {
+  const data = wearableData || [];
+  const latestData = data.length > 0 ? data[data.length - 1] : null;
+  const lastNightData = data.find(
+    (d) => new Date(d.timestamp).getDate() === new Date().getDate() - 1
+  );
 
-    // Prepare small sparkline data for heart rate & steps (last 7)
-    const hrPoints = data.slice(-7).map(d => ({ value: d.heartRate || 0, label: new Date(d.timestamp).toLocaleDateString() }));
-    const stepPoints = data.slice(-7).map(d => ({ value: d.steps || 0, label: new Date(d.timestamp).toLocaleDateString() }));
+  // Prepare small sparkline data for heart rate & steps (last 7)
+  // Commented out until HealthChart is re-enabled
+  // const hrPoints = data.slice(-7).map((d) => ({
+  //   value: d.heartRate || 0,
+  //   label: new Date(d.timestamp).toLocaleDateString(),
+  // }));
+  // const stepPoints = data.slice(-7).map((d) => ({
+  //   value: d.steps || 0,
+  //   label: new Date(d.timestamp).toLocaleDateString(),
+  // }));
 
-    return (
-        <div className="content-card p-6">
-            <h3 className="font-semibold text-lg text-text-primary mb-4">Health Vitals</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-red-500/10 rounded-full"><HeartPulseIcon className="w-6 h-6 text-red-500" /></div>
-                        <div>
-                            <p className="text-sm text-text-secondary">Heart Rate</p>
-                            <p className="text-xl font-bold text-text-primary">{latestData?.heartRate ?? '--'} <span className="text-sm font-normal">bpm</span></p>
-                        </div>
-                    </div>
-                    <div className="mt-2">
-                        <div style={{ height: '48px' }}><HealthChart data={hrPoints} color="#ef4444" unit="bpm" /></div>
-                        <p className="text-xs text-text-secondary mt-1">Last updated: {latestData ? new Date(latestData.timestamp).toLocaleString() : 'N/A'}</p>
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-sky-500/10 rounded-full"><StepIcon className="w-6 h-6 text-sky-500" /></div>
-                        <div>
-                            <p className="text-sm text-text-secondary">Steps Today</p>
-                            <p className="text-xl font-bold text-text-primary">{latestData?.steps?.toLocaleString() ?? '--'}</p>
-                        </div>
-                    </div>
-                    <div className="mt-2">
-                        <div style={{ height: '48px' }}><HealthChart data={stepPoints} color="#0284c7" unit="steps" /></div>
-                        <p className="text-xs text-text-secondary mt-1">Last updated: {latestData ? new Date(latestData.timestamp).toLocaleString() : 'N/A'}</p>
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-violet-500/10 rounded-full"><MoonIcon className="w-6 h-6 text-violet-500" /></div>
-                        <div>
-                            <p className="text-sm text-text-secondary">Last Sleep</p>
-                            <p className="text-xl font-bold text-text-primary">{lastNightData?.sleepHours ?? '--'} <span className="text-sm font-normal">hrs</span></p>
-                        </div>
-                    </div>
-                    <p className="text-xs text-text-secondary mt-2">Recorded: {lastNightData ? new Date(lastNightData.timestamp).toLocaleString() : 'N/A'}</p>
-                </div>
-            </div>
+  return (
+    <div className="modern-card">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="modern-card-title">Health Vitals</h3>
+        <span className="vitals-badge">Live</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="vital-card vital-card-heart">
+          <div className="vital-icon-wrapper">
+            <HeartIcon className="w-5 h-5" />
+          </div>
+          <div className="vital-content">
+            <p className="vital-label">Heart Rate</p>
+            <p className="vital-value">
+              {latestData?.heartRate ?? "--"}
+              <span className="vital-unit">bpm</span>
+            </p>
+            <p className="vital-timestamp">
+              {latestData
+                ? new Date(latestData.timestamp).toLocaleTimeString(undefined, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "N/A"}
+            </p>
+          </div>
         </div>
-    );
+
+        <div className="vital-card vital-card-steps">
+          <div className="vital-icon-wrapper">
+            <ActivityIcon className="w-5 h-5" />
+          </div>
+          <div className="vital-content">
+            <p className="vital-label">Steps Today</p>
+            <p className="vital-value">
+              {latestData?.steps?.toLocaleString() ?? "--"}
+            </p>
+            <p className="vital-timestamp">
+              {latestData
+                ? new Date(latestData.timestamp).toLocaleTimeString(undefined, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "N/A"}
+            </p>
+          </div>
+        </div>
+
+        <div className="vital-card vital-card-sleep">
+          <div className="vital-icon-wrapper">
+            <BedIcon className="w-5 h-5" />
+          </div>
+          <div className="vital-content">
+            <p className="vital-label">Last Sleep</p>
+            <p className="vital-value">
+              {lastNightData?.sleepHours ?? "--"}
+              <span className="vital-unit">hrs</span>
+            </p>
+            <p className="vital-timestamp">
+              {lastNightData
+                ? new Date(lastNightData.timestamp).toLocaleDateString()
+                : "N/A"}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = (props) => {
-  const [briefing, setBriefing] = useState('');
+  const [briefing, setBriefing] = useState("");
   const [isBriefingLoading, setIsBriefingLoading] = useState(true);
 
-  const upcomingAppointment = useMemo(() => props.appointments
-    .filter(a => new Date(`${a.date}T${a.time}`) >= new Date() && a.status === 'Confirmed')
-    .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0], [props.appointments]);
+  const upcomingAppointment = useMemo(
+    () =>
+      props.appointments
+        .filter(
+          (a) =>
+            new Date(`${a.date}T${a.time}`) >= new Date() &&
+            a.status === "Confirmed"
+        )
+        .sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        )[0],
+    [props.appointments]
+  );
 
   useEffect(() => {
     const fetchBriefing = async () => {
-        if (!props.user) return;
-        setIsBriefingLoading(true);
-        try {
-            const activePrescriptions = props.prescriptions.filter(p => p.status === 'Active');
-            const response = await geminiService.generateDailyBriefing(props.user, props.appointments, activePrescriptions);
-            setBriefing(response);
-        } catch (e) {
-            setBriefing('Could not load AI briefing at this time.');
-        } finally {
-            setIsBriefingLoading(false);
-        }
+      if (!props.user) return;
+      setIsBriefingLoading(true);
+      try {
+        const activePrescriptions = props.prescriptions.filter(
+          (p) => p.status === "Active"
+        );
+        const response = await geminiService.generateDailyBriefing(
+          props.user,
+          props.appointments,
+          activePrescriptions
+        );
+        setBriefing(response);
+      } catch (e) {
+        setBriefing("Could not load AI briefing at this time.");
+      } finally {
+        setIsBriefingLoading(false);
+      }
     };
     fetchBriefing();
   }, [props.user, props.appointments, props.prescriptions]);
 
   const greeting = getGreeting(props.t);
-  const appointmentDateTime = upcomingAppointment ? new Date(`${upcomingAppointment.date}T${upcomingAppointment.time}`) : null;
+  const appointmentDateTime = upcomingAppointment
+    ? new Date(`${upcomingAppointment.date}T${upcomingAppointment.time}`)
+    : null;
+
+  // Calculate quick stats
+  const activePrescriptionsCount = props.prescriptions.filter(
+    (p) => p.status === "Active"
+  ).length;
+  const unreadMessagesCount = props.messages.filter(
+    (m) => m.recipientId === props.user.id && !(m as any).isRead
+  ).length;
+  const upcomingAppointmentsCount = props.appointments.filter(
+    (a) =>
+      new Date(`${a.date}T${a.time}`) >= new Date() &&
+      a.status !== "Cancelled" &&
+      a.status !== "Completed"
+  ).length;
 
   return (
-    <div className="space-y-8" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
-        <div>
-            <h1 className="text-4xl font-bold text-text-primary">{greeting}, {props.user.name.split(' ')[0]}!</h1>
-            <p className="text-text-secondary mt-1 text-lg">{props.t('whatToDo')}</p>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-                {props.carePlan ? (
-                    <CoachingCorner patient={props.user} carePlan={props.carePlan} />
-                ) : (
-                    <AIBriefingCard briefing={briefing} isLoading={isBriefingLoading} />
-                )}
-                <HealthVitals wearableData={props.user.wearableData} />
-                <MiniSymptomChecker setActiveView={props.setActiveView} />
+    <div className="overview-page-redesign">
+      {/* Hero Header Section */}
+      <div className="overview-hero-section">
+        <div className="overview-hero-content">
+          <div className="overview-hero-greeting">
+            <h1 className="overview-hero-title">
+              {greeting}, {props.user.name.split(" ")[0]}!
+            </h1>
+            <p className="overview-hero-subtitle">
+              Here's what's happening with your health today
+            </p>
+          </div>
+          <div className="overview-quick-stats">
+            <div
+              className="overview-stat-card"
+              onClick={() => props.setActiveView("appointments")}
+            >
+              <div
+                className="overview-stat-icon"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                }}
+              >
+                <CalendarIcon className="w-5 h-5" />
+              </div>
+              <div className="overview-stat-content">
+                <div className="overview-stat-value">
+                  {upcomingAppointmentsCount}
+                </div>
+                <div className="overview-stat-label">Upcoming</div>
+              </div>
             </div>
+            <div
+              className="overview-stat-card"
+              onClick={() => props.setActiveView("prescriptions")}
+            >
+              <div
+                className="overview-stat-icon"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+                }}
+              >
+                <FileTextIcon className="w-5 h-5" />
+              </div>
+              <div className="overview-stat-content">
+                <div className="overview-stat-value">
+                  {activePrescriptionsCount}
+                </div>
+                <div className="overview-stat-label">Active Rx</div>
+              </div>
+            </div>
+            <div
+              className="overview-stat-card"
+              onClick={() => props.setActiveView("messages")}
+            >
+              <div
+                className="overview-stat-icon"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                }}
+              >
+                <MessageSquareIcon className="w-5 h-5" />
+              </div>
+              <div className="overview-stat-content">
+                <div className="overview-stat-value">{unreadMessagesCount}</div>
+                <div className="overview-stat-label">Messages</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-            <div className="space-y-6">
-                {upcomingAppointment && (
-                    <div className="content-card p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                             <div className="p-3 bg-primary-light-bg rounded-full">
-                                <CalendarIcon className="w-6 h-6 text-primary" />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-text-primary">{props.t('upcomingAppointment')}</h3>
-                                <p className="text-sm text-text-secondary">
-                                    {new Date(appointmentDateTime!).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="bg-background-tertiary p-4 rounded-lg border border-border-primary">
-                            <p className="font-bold text-lg text-text-primary">{appointmentDateTime?.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
-                            <p className="text-text-secondary text-sm">{props.t('with')} <span className="font-medium text-text-primary">{upcomingAppointment.doctorName}</span></p>
-                            <p className="text-primary text-sm font-semibold">{upcomingAppointment.specialty}</p>
-                                {props.user.wearableDevices && props.user.wearableDevices.length > 0 && (
-                                    <div className="content-card p-4">
-                                        <h4 className="font-semibold text-lg mb-2">Connected Devices</h4>
-                                        <ul className="text-sm text-text-secondary">
-                                            {props.user.wearableDevices.slice(0,3).map(d => (
-                                                <li key={d.id}>{d.name} • {d.type}</li>
-                                            ))}
-                                            {props.user.wearableDevices.length > 3 && <li className="mt-2 text-xs">And {props.user.wearableDevices.length - 3} more...</li>}
-                                        </ul>
-                                    </div>
-                                )}
-                        </div>
-                    </div>
-                )}
-                <RecentMessages 
-                    messages={props.messages} 
-                    contacts={props.contacts} 
-                    currentUser={props.user} 
-                    setActiveView={props.setActiveView}
-                />
-            </div>
+      {/* Main Content Grid */}
+      <div className="overview-content-grid">
+        {/* Left Column - Primary Content */}
+        <div className="overview-primary-column">
+          {/* AI Briefing or Care Plan */}
+          {props.carePlan ? (
+            <CoachingCorner patient={props.user} carePlan={props.carePlan} />
+          ) : (
+            <AIBriefingCard briefing={briefing} isLoading={isBriefingLoading} />
+          )}
+
+          {/* Health Vitals */}
+          <HealthVitals wearableData={props.user.wearableData} />
+
+          {/* Mini Symptom Checker */}
+          <MiniSymptomChecker setActiveView={props.setActiveView} />
         </div>
+
+        {/* Right Column - Sidebar */}
+        <div className="overview-sidebar-column">
+          {/* Upcoming Appointment Card */}
+          {upcomingAppointment && (
+            <div className="overview-appointment-card">
+              <div className="overview-appointment-header">
+                <div className="overview-appointment-header-icon">
+                  <CalendarIcon className="w-6 h-6" />
+                </div>
+                <div className="overview-appointment-header-content">
+                  <h3 className="overview-appointment-title">
+                    Next Appointment
+                  </h3>
+                  <p className="overview-appointment-date">
+                    {new Date(appointmentDateTime!).toLocaleDateString(
+                      undefined,
+                      {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      }
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="overview-appointment-body">
+                <div className="overview-appointment-time-section">
+                  <ClockIcon className="w-5 h-5" />
+                  <span className="overview-appointment-time">
+                    {appointmentDateTime?.toLocaleTimeString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                <div className="overview-appointment-doctor-section">
+                  <UserIcon className="w-5 h-5" />
+                  <div>
+                    <div className="overview-appointment-doctor-name">
+                      {upcomingAppointment.doctorName}
+                    </div>
+                    <div className="overview-appointment-specialty">
+                      {upcomingAppointment.specialty}
+                    </div>
+                  </div>
+                </div>
+                {upcomingAppointment.consultingRoomName && (
+                  <div className="overview-appointment-location">
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    <span>{upcomingAppointment.consultingRoomName}</span>
+                  </div>
+                )}
+                <button
+                  className="overview-appointment-action"
+                  onClick={() => props.setActiveView("appointments")}
+                >
+                  <span>View All Appointments</span>
+                  <ArrowRightIcon className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Messages */}
+          <RecentMessages
+            messages={props.messages}
+            contacts={props.contacts}
+            currentUser={props.user}
+            setActiveView={props.setActiveView}
+          />
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import * as Icons from '../icons/index.tsx';
 
 interface DashboardLayoutProps {
     sidebar: React.ReactNode;
@@ -14,9 +15,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ sidebar, heade
             <div className="dashboard-sidebar-wrapper">
                 {sidebar}
                 {onSignOut && (
-                    <div className="dashboard-sidebar-footer p-4">
-                        <button onClick={onSignOut} className="w-full btn-ghost" aria-label="Sign Out from sidebar">
-                            Sign Out
+                    <div className="dashboard-sidebar-footer">
+                        <button onClick={onSignOut} className="sidebar-link sidebar-sign-out" aria-label="Sign Out from sidebar">
+                            <Icons.LogOutIcon />
+                            <span>Sign Out</span>
                         </button>
                     </div>
                 )}

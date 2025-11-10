@@ -38,18 +38,8 @@ const App: React.FC = () => {
   const [view, setView] = useState<View>('auth');
   const [initialTab, setInitialTab] = useState<'login' | 'register'>('login');
   
-  // Safety: Force stop loading after 1 second maximum - be aggressive
-  useEffect(() => {
-    const maxLoadTimeout = setTimeout(() => {
-      if (isLoading) {
-        console.warn("App: Maximum loading timeout reached (1s) - forcing stop");
-        setIsLoading(false);
-        setView('auth');
-      }
-    }, 1000); // Reduced to 1 second
-    
-    return () => clearTimeout(maxLoadTimeout);
-  }, [isLoading]);
+  // Removed aggressive 1-second timeout - let fetchUser handle its own timeout (10 seconds)
+  // This prevents false logouts on slow network connections
   
   console.log("App: Initializing hooks");
   let theme: 'light' | 'dark';
@@ -76,24 +66,20 @@ const App: React.FC = () => {
     console.log("App: fetchUser called");
     setIsLoading(true);
     
-    // Add a fallback timeout to ensure loading never gets stuck
+    // Add a fallback timeout to ensure loading never gets stuck - increased to 10 seconds
     const loadingTimeout = setTimeout(() => {
       console.warn("App: fetchUser timeout - forcing stop loading");
       setIsLoading(false);
-      setView('auth');
-    }, 3000); // 3 second max
+      // Don't clear token or change view on timeout - might be network issue
+      // Just stop loading and let user see current state
+    }, 10000); // 10 second max
     
     try {
       const token = api.getAuthToken();
       if (token) {
         console.log("App: Token found, fetching user data");
         try {
-          // Add timeout to the fetch itself
-          const controller = new AbortController();
-          const fetchTimeout = setTimeout(() => controller.abort(), 2000);
-          
           const userData = await api.fetchCurrentUser();
-          clearTimeout(fetchTimeout);
           
           console.log("App: User data fetched successfully", userData);
           clearTimeout(loadingTimeout);
@@ -101,30 +87,76 @@ const App: React.FC = () => {
           setView('dashboard');
           setIsLoading(false);
           return;
-        } catch (error) {
-          console.error("App: Session expired or invalid", error);
-          api.clearAuthToken();
-          setView('auth');
+        } catch (error: any) {
           clearTimeout(loadingTimeout);
           setIsLoading(false);
+          
+          // Only clear token and sign out on actual 401 Unauthorized errors
+          if (error?.status === 401 || (error?.message && error.message.includes('Unauthorized'))) {
+            console.error("App: Session expired or invalid (401)", error);
+            api.clearAuthToken();
+            setView('auth');
+            return;
+          }
+          
+          // For network errors, timeouts, or other errors, don't sign out
+          // Just log the error and keep the user logged in (token might still be valid)
+          console.warn("App: Failed to fetch user data (non-critical):", error);
+          // Don't change view - user might still be authenticated, just network issue
+          // The token remains in localStorage, so user can retry
           return;
         }
       } else {
         console.log("App: No token found, showing auth page");
-        setView('auth');
         clearTimeout(loadingTimeout);
+        setView('auth');
         setIsLoading(false);
         return;
       }
     } catch (error) {
       console.error("App: Error in fetchUser:", error);
-      setView('auth');
       clearTimeout(loadingTimeout);
       setIsLoading(false);
+      // Don't clear token or change view on unexpected errors
+      // Might be a temporary issue
     }
   }, [handleSignOut]);
+
+  // Safe refetch function for WebSocket updates - never signs out on errors
+  const refetchUserData = useCallback(async () => {
+    console.log("App: refetchUserData called (safe refetch)");
+    
+    try {
+      const token = api.getAuthToken();
+      if (!token) {
+        console.log("App: No token found in refetchUserData - skipping");
+        return;
+      }
+
+      // Only update user data if we're already logged in
+      if (!user) {
+        console.log("App: No user state in refetchUserData - skipping");
+        return;
+      }
+
+      try {
+        const userData = await api.fetchCurrentUser();
+        console.log("App: User data refreshed successfully", userData);
+        setUser(userData);
+        // Don't change view or loading state - just update user data
+      } catch (error: any) {
+        // On error, just log it - don't sign out or change view
+        console.warn("App: Failed to refresh user data (non-critical):", error);
+        // User can continue working - this is just a background refresh
+      }
+    } catch (error) {
+      // Catch any unexpected errors
+      console.warn("App: Unexpected error in refetchUserData:", error);
+      // Don't sign out - let user continue working
+    }
+  }, [user]);
   
-  useWebSocket(user?.id, fetchUser);
+  useWebSocket(user?.id, refetchUserData);
 
   useEffect(() => {
     console.log("App: useEffect for SSO callback running");
@@ -221,15 +253,9 @@ const App: React.FC = () => {
   const renderContent = () => {
     console.log("App: renderContent called, isLoading:", isLoading, "view:", view);
     
-    // If loading, show loader BUT with a hard timeout
+    // If loading, show loader - let fetchUser handle its own timeout
     if (isLoading) {
       console.log("App: Showing FullScreenLoader");
-      // Immediately schedule to stop loading after 300ms max
-      setTimeout(() => {
-        console.warn("App: Force stopping loading state after timeout");
-        setIsLoading(false);
-        setView('auth');
-      }, 300);
       return <FullScreenLoader message="Loading..." />;
     }
 

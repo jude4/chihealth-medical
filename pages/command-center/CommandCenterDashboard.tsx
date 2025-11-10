@@ -160,19 +160,19 @@ const CommandCenterDashboard: React.FC<CommandCenterDashboardProps> = (props) =>
     const inpatients = data.patients.filter(p => p.inpatientStay);
     
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-start">
-                <div>
-                    <h2 className="text-3xl font-bold text-text-primary">Hospital Operations Command Center</h2>
-                    <p className="text-text-secondary">Real-time overview of facility status and patient flow.</p>
+        <div className="command-center-page">
+            <div className="command-center-header">
+                <div className="command-center-header-content">
+                    <h2>Hospital Operations Command Center</h2>
+                    <p>Real-time overview of facility status and patient flow.</p>
                 </div>
-                <div className="flex gap-4">
+                <div className="command-center-actions">
                     <Button onClick={() => setDischargeModalOpen(true)}><Icons.DoorOpenIcon className="w-5 h-5 mr-2" /> Discharge Patient</Button>
                     <Button onClick={() => setAdmitModalOpen(true)}><Icons.BedDoubleIcon className="w-5 h-5 mr-2" /> Admit Patient</Button>
                 </div>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+            <div className="command-center-stats-grid">
                 <StatCard icon={Icons.BedIcon} title="Bed Occupancy" value={`${data.kpis.bedOccupancy}`} unit="%" color="bg-cyan-500" />
                 <StatCard icon={Icons.BedDoubleIcon} title="Admissions (24h)" value={data.kpis.admissionsToday} color="bg-green-500" />
                 <StatCard icon={Icons.DoorOpenIcon} title="Discharges (24h)" value={data.kpis.dischargesToday} color="bg-amber-500" />
@@ -180,8 +180,8 @@ const CommandCenterDashboard: React.FC<CommandCenterDashboardProps> = (props) =>
                 <StatCard icon={Icons.CalendarIcon} title="Avg. Length of Stay" value={data.kpis.avgLengthOfStay} unit="days" color="bg-violet-500" />
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-                <div className="xl:col-span-2">
+            <div className="command-center-content-grid">
+                <div>
                     <BedManagement beds={data.beds} rooms={data.rooms} onBedClick={handleBedClick} />
                 </div>
                 <div>

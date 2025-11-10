@@ -14,8 +14,8 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ theme, toggleTheme }) 
       aria-label="Toggle theme"
     >
       {theme === 'light' ? 
-        <MoonIcon style={{height: '24px', width: '24px'}} /> : 
-        <SunIcon style={{height: '24px', width: '24px'}} />
+        <MoonIcon style={{height: '18px', width: '18px'}} /> : 
+        <SunIcon style={{height: '18px', width: '18px'}} />
       }
     </button>
   );

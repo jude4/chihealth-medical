@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { User, UserRole, Organization, Department } from '../../types.ts';
 import { Button } from '../../components/common/Button.tsx';
 import { EditStaffModal } from './EditStaffModal.tsx';
+import { AddStaffModal } from './AddStaffModal.tsx';
 import { EmptyState } from '../../components/common/EmptyState.tsx';
 import { UsersIcon } from '../../components/icons/index.tsx';
+import * as api from '../../services/apiService.ts';
+import { useToasts } from '../../hooks/useToasts.ts';
 
 interface StaffManagementViewProps {
   staff: User[];
@@ -11,6 +14,7 @@ interface StaffManagementViewProps {
   departments: Department[];
   onUpdateUser: (user: User) => void;
   currentUser: User;
+  onRefresh?: () => void;
 }
 
 const roleDisplay: Record<UserRole, string> = {
@@ -25,19 +29,51 @@ const roleDisplay: Record<UserRole, string> = {
     command_center: 'Command Center',
 };
 
-export const StaffManagementView: React.FC<StaffManagementViewProps> = ({ staff, organizations, departments, onUpdateUser, currentUser }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+export const StaffManagementView: React.FC<StaffManagementViewProps> = ({ 
+  staff, 
+  organizations, 
+  departments, 
+  onUpdateUser, 
+  currentUser,
+  onRefresh 
+}) => {
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<User | null>(null);
+  const { addToast } = useToasts();
 
   const handleEdit = (user: User) => {
     setSelectedStaff(user);
-    setIsModalOpen(true);
+    setIsEditModalOpen(true);
   };
 
-  const handleSave = (updatedUser: User) => {
+  const handleEditSave = (updatedUser: User) => {
     onUpdateUser(updatedUser);
-    setIsModalOpen(false);
+    setIsEditModalOpen(false);
     setSelectedStaff(null);
+  };
+
+  const handleAddStaff = async (staffData: {
+    name: string;
+    email: string;
+    password: string;
+    role: UserRole;
+    departmentIds?: string[];
+    organizationIds?: string[];
+  }) => {
+    try {
+      await api.createStaff(staffData);
+      // Refresh the staff list
+      if (onRefresh) {
+        onRefresh();
+      } else {
+        // Fallback: reload the page if no refresh callback
+        window.location.reload();
+      }
+    } catch (error: any) {
+      // Error is already handled in AddStaffModal, but re-throw so modal can handle it
+      throw error;
+    }
   };
   
   const getDepartmentNames = (departmentIds?: string[]) => {
@@ -57,7 +93,7 @@ export const StaffManagementView: React.FC<StaffManagementViewProps> = ({ staff,
     <>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold text-text-primary">Staff Management</h2>
-        <Button onClick={() => alert("Add Staff feature coming soon!")}>Add New Staff Member</Button>
+        <Button onClick={() => setIsAddModalOpen(true)}>Add New Staff Member</Button>
       </div>
       <div className="content-card">
         {staff.length > 0 ? (
@@ -92,14 +128,26 @@ export const StaffManagementView: React.FC<StaffManagementViewProps> = ({ staff,
         )}
       </div>
 
+      <AddStaffModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        organizations={organizations}
+        departments={departments}
+        onSave={handleAddStaff}
+        currentUser={currentUser}
+      />
+      
       {selectedStaff && (
         <EditStaffModal 
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
+            isOpen={isEditModalOpen}
+            onClose={() => {
+              setIsEditModalOpen(false);
+              setSelectedStaff(null);
+            }}
             user={selectedStaff}
             organizations={organizations}
             departments={departments}
-            onSave={handleSave}
+            onSave={handleEditSave}
             currentUser={currentUser}
         />
       )}

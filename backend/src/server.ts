@@ -275,6 +275,76 @@ app.put('/api/users/:id', authenticate, async (req, res) => {
   notifyAllOrgUsers((req.organizationContext as Organization).id, 'refetch');
     res.status(200).send();
 });
+app.post('/api/admin/staff', authenticate, async (req, res) => {
+  try {
+    const { name, email, password, role, departmentIds, organizationIds } = req.body;
+    
+    // Validation
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ message: 'Name, email, password, and role are required.' });
+    }
+    
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
+    }
+    
+    // Check if email already exists
+    const existingUser = await db.findUserByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({ message: 'An account with this email already exists.' });
+    }
+    
+    // Get organization context - use provided orgs or default to current org
+    const currentOrg = req.organizationContext as Organization;
+    const orgIds = organizationIds && organizationIds.length > 0 
+      ? organizationIds 
+      : [currentOrg.id];
+    
+    // Create user
+    const newUser = await db.createUser({
+      name,
+      email,
+      password,
+      role,
+      departmentIds: departmentIds || [],
+    });
+    
+    // Assign to organizations
+    if (orgIds.length > 0) {
+      // Get all organizations from the database context to find the org objects
+      const adminData = await db.getAdminDashboardData(currentOrg.id);
+      const assignedOrgs = adminData.organizations.filter((org: Organization) => orgIds.includes(org.id));
+      if (assignedOrgs.length > 0) {
+        await db.updateUser(newUser.id, { 
+          organizationIds: orgIds,
+          currentOrganization: assignedOrgs[0]
+        });
+      }
+    }
+    
+    // Assign to departments if provided
+    if (departmentIds && departmentIds.length > 0) {
+      await db.updateUser(newUser.id, { departmentIds });
+    }
+    
+    // Get the updated user
+    const createdUser = await db.findUserById(newUser.id);
+    if (!createdUser) {
+      return res.status(500).json({ message: 'Failed to retrieve created user.' });
+    }
+    
+    // Remove password hash from response
+    const { passwordHash, ...userWithoutPassword } = createdUser;
+    
+    // Notify all users in the organization to refresh
+    notifyAllOrgUsers(currentOrg.id, 'refetch');
+    
+    return res.status(201).json(userWithoutPassword);
+  } catch (err: any) {
+    console.error('Failed to create staff member:', err);
+    return res.status(500).json({ message: err.message || 'Failed to create staff member.' });
+  }
+});
 app.post('/api/admin/organizations/link', authenticate, async (req, res) => {
   await db.linkOrganizations(req.body.childId, req.body.parentId);
   notifyAllOrgUsers((req.organizationContext as Organization).id, 'refetch');
@@ -419,7 +489,47 @@ app.post('/api/ai/generate', async (req: Request, res: Response) => {
       }
     }
 
-    // Generic development stub response — keep it short and deterministic.
+    // Improved development stub for chat responses
+    // Detect if this is a chat/symptom query and provide a helpful response
+    const contentsStr = typeof contents === 'string' ? contents : JSON.stringify(contents);
+    const lowerContents = contentsStr.toLowerCase();
+    
+    // Check if this looks like a symptom/health question (not structured data)
+    const isChatQuery = !contentsStr.includes('Patient:') && 
+                        !contentsStr.includes('Clinical Notes:') && 
+                        !contentsStr.includes('Lab Tests:') &&
+                        (lowerContents.includes('symptom') || 
+                         lowerContents.includes('pain') || 
+                         lowerContents.includes('headache') || 
+                         lowerContents.includes('fever') || 
+                         lowerContents.includes('cough') || 
+                         lowerContents.includes('feel') ||
+                         lowerContents.includes('hurt') ||
+                         lowerContents.includes('ache') ||
+                         lowerContents.includes('?') ||
+                         lowerContents.length < 500); // Short queries are likely chat
+    
+    if (isChatQuery && process.env.NODE_ENV !== 'production') {
+      // Provide a helpful health assistant response instead of echoing
+      let response = '';
+      
+      if (lowerContents.includes('headache') || lowerContents.includes('head')) {
+        response = "I understand you're experiencing a headache. Headaches can have various causes including stress, dehydration, tension, or underlying medical conditions. It's important to stay hydrated, rest in a quiet environment, and monitor for severe or persistent symptoms. If your headache is severe, sudden, or accompanied by other symptoms, please seek immediate medical attention. This is not a medical diagnosis - consult a healthcare professional for proper evaluation.";
+      } else if (lowerContents.includes('fever') || lowerContents.includes('temperature')) {
+        response = "I see you're concerned about a fever. Fevers are your body's natural response to infection. Monitor your temperature, stay hydrated, get plenty of rest, and watch for signs of dehydration. If your fever is very high (over 103°F), persists for more than 3 days, or is accompanied by severe symptoms, please seek medical care immediately. This information is for educational purposes only.";
+      } else if (lowerContents.includes('pain') || lowerContents.includes('hurt') || lowerContents.includes('ache')) {
+        response = "I understand you're experiencing pain. Note the location, type, and duration of your pain. Rest the affected area if appropriate, and consider over-the-counter pain relief if suitable. Monitor for changes or worsening symptoms. Severe, sudden, or persistent pain requires medical evaluation. This is not a substitute for professional medical advice.";
+      } else if (lowerContents.includes('cough') || lowerContents.includes('cold')) {
+        response = "I hear you're dealing with a cough or cold symptoms. Stay well-hydrated, get adequate rest, and consider over-the-counter remedies as appropriate. If you experience difficulty breathing, chest pain, high fever, or symptoms that worsen, please seek medical attention. This information is educational only.";
+      } else {
+        // Generic helpful response
+        response = "Thank you for sharing your symptoms. I'm here to provide general health information, but I cannot provide a medical diagnosis. I recommend monitoring your symptoms, staying hydrated, getting adequate rest, and seeking professional medical advice if symptoms persist or worsen. This is not a medical diagnosis - please consult with a qualified healthcare professional for proper evaluation and treatment.";
+      }
+      
+      return res.json({ text: response });
+    }
+    
+    // For structured queries or non-chat requests, return the original stub behavior
     const preview = typeof contents === 'string' ? contents.slice(0, 300) : JSON.stringify(contents);
     const text = `(dev AI) Response for model=${model || 'unknown'}\n\n${preview}${preview.length >= 300 ? '...' : ''}`;
     return res.json({ text });

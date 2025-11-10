@@ -2,41 +2,49 @@ import React, { useState } from 'react';
 import { ChatMessage, MessageRole, TriageSuggestion } from '../../types.ts';
 import { runChat, getTriageSuggestion } from '../../services/geminiService.ts';
 import { AISuggestionCard } from '../../components/patient/AISuggestionCard.tsx';
-// Fix: Import the Button component.
 import { Button } from '../../components/common/Button.tsx';
+import { HealthAssistantIcon, UserIcon, SendIcon as SendIconSVG, SparklesIcon } from '../../components/icons/index.tsx';
 
 interface SymptomCheckerProps {
     onBookAppointmentWithSuggestion: (specialty: string) => void;
 }
 
-const UserIcon: React.FC = () => (
-    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-white flex-shrink-0">U</div>
+const UserAvatar: React.FC = () => (
+    <div className="ai-chat-user-avatar">
+        <UserIcon className="w-4 h-4" />
+    </div>
 );
-const ModelIcon: React.FC = () => (
-    <div className="w-8 h-8 rounded-full bg-background-tertiary flex items-center justify-center flex-shrink-0">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
+
+const AIAvatar: React.FC = () => (
+    <div className="ai-chat-ai-avatar">
+        <HealthAssistantIcon className="w-5 h-5" />
     </div>
 );
 
 const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   const isModel = message.role === MessageRole.MODEL;
-  const bubbleClasses = `max-w-2xl px-5 py-3 rounded-2xl ${isModel ? 'bg-background-tertiary rounded-bl-none' : 'bg-primary text-white rounded-br-none'}`;
+  
   return (
-    <div className={`flex items-start gap-3 ${!isModel && 'justify-end'}`}>
-      {isModel && <ModelIcon />}
-      <div className={bubbleClasses}>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+    <div className={`ai-chat-message ${isModel ? 'ai-chat-message-ai' : 'ai-chat-message-user'}`}>
+      {isModel && <AIAvatar />}
+      <div className={`ai-chat-bubble ${isModel ? 'ai-chat-bubble-ai' : 'ai-chat-bubble-user'}`}>
+        <div className="ai-chat-bubble-content">
+          <p className="ai-chat-text">{message.content}</p>
+        </div>
       </div>
-       {!isModel && <UserIcon />}
+      {!isModel && <UserAvatar />}
     </div>
   );
 };
 
 const SendIcon: React.FC<{ isLoading: boolean }> = ({ isLoading }) => (
   isLoading ? (
-    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
   ) : (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>
+    <SendIconSVG className="w-5 h-5" />
   )
 );
 
@@ -90,34 +98,88 @@ export const SymptomChecker: React.FC<SymptomCheckerProps> = ({ onBookAppointmen
   };
 
   return (
-    <div className="flex flex-col h-full content-card overflow-hidden">
-      <div className="p-6 border-b border-border-primary">
-          <h2 className="text-2xl font-bold text-text-primary">AI Health Assistant</h2>
-          <p className="text-text-secondary text-sm">Get information and guidance on your symptoms.</p>
+    <div className="ai-assistant-container">
+      <div className="ai-assistant-header">
+        <div className="ai-assistant-header-icon">
+          <HealthAssistantIcon className="w-6 h-6" />
+        </div>
+        <div className="ai-assistant-header-content">
+          <h2 className="ai-assistant-title">AI Health Assistant</h2>
+          <p className="ai-assistant-subtitle">Get instant information and guidance about your symptoms</p>
+        </div>
+        <div className="ai-assistant-header-badge">
+          <SparklesIcon className="w-4 h-4" />
+          <span>AI Powered</span>
+        </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {messages.map((msg, index) => <MessageBubble key={index} message={msg} />)}
-        {aiSuggestion && (
-            <AISuggestionCard suggestion={aiSuggestion} onBookAppointment={onBookAppointmentWithSuggestion} />
-        )}
-        <div ref={messagesEndRef} />
+      <div className="ai-assistant-disclaimer">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>This is not a medical diagnosis. Please consult a qualified healthcare professional for any health concerns.</span>
       </div>
       
-      <div className="p-4 border-t border-border-primary">
-        {error && <p className="text-red-500 text-sm mb-2 text-center">{error}</p>}
-        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+      <div className="ai-assistant-messages">
+        <div className="ai-assistant-messages-inner">
+          {messages.map((msg, index) => (
+            <MessageBubble key={index} message={msg} />
+          ))}
+          {isLoading && (
+            <div className="ai-chat-message ai-chat-message-ai">
+              <AIAvatar />
+              <div className="ai-chat-bubble ai-chat-bubble-ai">
+                <div className="ai-chat-typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            </div>
+          )}
+          {aiSuggestion && (
+            <div className="ai-assistant-suggestion-wrapper">
+              <AISuggestionCard suggestion={aiSuggestion} onBookAppointment={onBookAppointmentWithSuggestion} />
+            </div>
+          )}
+          {error && (
+            <div className="ai-assistant-error">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{error}</span>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+      
+      <div className="ai-assistant-input-area">
+        <form onSubmit={handleSendMessage} className="ai-assistant-form">
+          <div className="ai-assistant-input-wrapper">
             <input 
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Describe your symptoms..."
-                className="flex-1 form-input"
-                disabled={isLoading}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Describe your symptoms or ask a question..."
+              className="ai-assistant-input"
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !isLoading && input.trim()) {
+                  e.preventDefault();
+                  handleSendMessage(e);
+                }
+              }}
             />
-            <Button type="submit" isLoading={isLoading} disabled={!input.trim()}>
-                <SendIcon isLoading={isLoading} />
-            </Button>
+            <button 
+              type="submit" 
+              className="ai-assistant-send-button"
+              disabled={!input.trim() || isLoading}
+            >
+              <SendIcon isLoading={isLoading} />
+            </button>
+          </div>
+          <p className="ai-assistant-input-hint">Press Enter to send, Shift+Enter for new line</p>
         </form>
       </div>
     </div>

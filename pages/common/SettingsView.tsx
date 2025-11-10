@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Patient } from '../../types.ts';
 import { Button } from '../../components/common/Button.tsx';
 import { Input } from '../../components/common/Input.tsx';
@@ -104,6 +104,22 @@ const ProfileSettings: React.FC<{
     email: user.email,
     dateOfBirth: 'dateOfBirth' in user ? user.dateOfBirth : '',
   });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>((user as any).avatarUrl || null);
+
+  // Update avatar URL when user prop changes
+  useEffect(() => {
+    if ((user as any).avatarUrl) {
+      const url = (user as any).avatarUrl;
+      const fullUrl = url.startsWith('http') 
+        ? url 
+        : url.startsWith('/')
+          ? `${window.location.origin}${url}`
+          : url;
+      setAvatarUrl(fullUrl);
+    } else {
+      setAvatarUrl(null);
+    }
+  }, [(user as any).avatarUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,9 +144,13 @@ const ProfileSettings: React.FC<{
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '42rem' }}>
         <div className="profile-avatar-wrapper">
           <img
-            src={(user as any).avatarUrl || `https://i.pravatar.cc/150?u=${user.id}`}
+            src={avatarUrl || (user as any).avatarUrl || `https://i.pravatar.cc/150?u=${user.id}`}
             alt={user.name}
             className="profile-avatar"
+            onError={(e) => {
+              // Fallback to default avatar if image fails to load
+              (e.target as HTMLImageElement).src = `https://i.pravatar.cc/150?u=${user.id}`;
+            }}
           />
           <div>
             <input
@@ -145,20 +165,55 @@ const ProfileSettings: React.FC<{
                   addToast('File too large. Maximum 2MB.', 'error');
                   return;
                 }
+                
+                // Show preview immediately
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  if (event.target?.result) {
+                    setAvatarUrl(event.target.result as string);
+                  }
+                };
+                reader.readAsDataURL(file);
+                
                 try {
                   setIsSaving(true);
                   const res = await api.uploadAvatar(file as File);
-                  addToast('Avatar uploaded.', 'success');
-                  const updatedUser = res.user || {};
-                  if (onUpdate) onUpdate(updatedUser);
+                  
+                  // Update avatar URL from response
+                  const newAvatarUrl = res.avatarUrl || (res.user as any)?.avatarUrl;
+                  if (newAvatarUrl) {
+                    // If the response includes a full URL, use it; otherwise construct it
+                    const fullUrl = newAvatarUrl.startsWith('http') 
+                      ? newAvatarUrl 
+                      : newAvatarUrl.startsWith('/')
+                        ? `${window.location.origin}${newAvatarUrl}`
+                        : newAvatarUrl;
+                    setAvatarUrl(fullUrl);
+                  }
+                  
+                  addToast('Avatar uploaded successfully.', 'success');
+                  
+                  // Update parent component with new user data
+                  const updatedUser = res.user || { ...user, avatarUrl: newAvatarUrl };
+                  if (onUpdate) {
+                    onUpdate(updatedUser);
+                  }
                 } catch (err: any) {
                   console.error('Avatar upload failed', err);
+                  // Revert to original avatar on error
+                  setAvatarUrl((user as any).avatarUrl || null);
                   addToast(err?.message || 'Failed to upload avatar', 'error');
-                } finally { setIsSaving(false); }
+                } finally { 
+                  setIsSaving(false);
+                  // Reset file input
+                  e.target.value = '';
+                }
               }}
             />
             <label htmlFor="avatarInput">
-              <Button type="button">Change Photo</Button>
+              <Button type="button" disabled={isSaving}>
+                {isSaving ? 'Uploading...' : 'Change Photo'}
+              </Button>
             </label>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>JPG, PNG or GIF. Max size 2MB</p>
           </div>

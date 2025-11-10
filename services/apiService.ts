@@ -1,4 +1,4 @@
-import { User, Patient, Appointment, ClinicalNote, LabTest, Prescription, Referral, Organization } from '../types';
+import { User, Patient, Appointment, ClinicalNote, LabTest, Prescription, Referral, Organization, UserRole } from '../types';
 
 // In development, the frontend runs on :5173 and the backend on :8080.
 // Prefer a direct backend URL in that case so health probes and direct API calls
@@ -87,11 +87,11 @@ const apiFetch = async (url: string, options: RequestInit = {}) => {
 
 // --- Auth & User ---
 export const fetchCurrentUser = (): Promise<User> => {
-  // Add timeout to prevent hanging
+  // Add timeout to prevent hanging - increased to 8 seconds for better reliability
   return Promise.race([
     apiFetch('/users/me'),
     new Promise<User>((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout - backend may not be running')), 2000)
+      setTimeout(() => reject(new Error('Request timeout - backend may not be running')), 8000)
     )
   ]);
 };
@@ -119,6 +119,21 @@ export const switchOrganization = async (orgId: string): Promise<User> => {
 };
 export const updateUser = (user: User): Promise<User> => {
     return apiFetch(`/users/${user.id}`, { method: 'PUT', body: JSON.stringify(user) });
+};
+
+// Create new staff member
+export const createStaff = (staffData: {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  departmentIds?: string[];
+  organizationIds?: string[];
+}): Promise<User> => {
+  return apiFetch('/admin/staff', { 
+    method: 'POST', 
+    body: JSON.stringify(staffData) 
+  });
 };
 
 // Upload avatar image (multipart/form-data)

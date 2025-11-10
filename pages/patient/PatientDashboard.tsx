@@ -70,9 +70,16 @@ const PatientDashboard: React.FC<PatientDashboardProps> = (props) => {
       setIsLoading(true);
       const patientData = await api.fetchPatientData();
       setData(patientData);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch patient data:", error);
-      addToast('Failed to load dashboard data.', 'error');
+      // Don't sign out on errors - just show a message
+      if (error?.status === 401) {
+        // Session might have expired, but don't force sign out
+        // Let the user continue working - they can manually sign out if needed
+        addToast('Session may have expired. Please refresh if issues persist.', 'warning');
+      } else {
+        addToast('Failed to load dashboard data. Please try again.', 'error');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -83,10 +90,30 @@ const PatientDashboard: React.FC<PatientDashboardProps> = (props) => {
   }, [fetchData]);
 
   const handleBookAppointment = async (newAppointment: Omit<Appointment, 'id' | 'status' | 'patientId'>) => {
-    await api.bookAppointment(newAppointment);
-    addToast('Appointment booked successfully!', 'success');
-    fetchData();
-    setActiveView('appointments');
+    try {
+      await api.bookAppointment(newAppointment);
+      addToast('Appointment booked successfully!', 'success');
+      // Refresh data to show the new appointment
+      try {
+        await fetchData();
+      } catch (fetchError) {
+        // If fetch fails, don't throw - just log it
+        console.warn('Failed to refresh data after booking:', fetchError);
+      }
+      setActiveView('appointments');
+    } catch (error: any) {
+      console.error('Failed to book appointment:', error);
+      // Never sign out on booking errors - just show error message
+      if (error?.status === 401) {
+        addToast('Authentication error. Please try again or refresh the page.', 'error');
+      } else if (error?.message) {
+        addToast(error.message, 'error');
+      } else {
+        addToast('Failed to book appointment. Please try again.', 'error');
+      }
+      // Re-throw error so modal can handle it (keep modal open)
+      throw error;
+    }
   };
   
   const handleBookAppointmentWithSuggestion = (specialty: string) => {
@@ -138,7 +165,12 @@ const PatientDashboard: React.FC<PatientDashboardProps> = (props) => {
       />;
       case 'symptom-checker': return <SymptomChecker onBookAppointmentWithSuggestion={handleBookAppointmentWithSuggestion} />;
       case 'wearables': return <WearablesView patient={props.user} onSimulateData={handleSimulateWearableData} />;
-      case 'settings': return <SettingsView user={props.user} />;
+      case 'settings': return <SettingsView user={props.user} onUpdateUser={async (updatedUser) => {
+        // Update the user state and refresh data
+        setData((prev: any) => ({ ...prev, user: updatedUser }));
+        // Also update props.user if possible (though props are read-only, we'll refresh from API)
+        await fetchData();
+      }} />;
       default: return <div>Overview</div>;
     }
   };

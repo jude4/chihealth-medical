@@ -27,25 +27,41 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = (props) => {
     
     const unreadCount = props.notifications.filter(n => !n.isRead).length;
 
-    const UserAvatar: React.FC = () => (
-        <div className="flex items-center gap-3">
-             <img 
-                src={`https://i.pravatar.cc/150?u=${user.id}`} 
-                alt={user.name}
-                className="w-10 h-10 rounded-full border-2 border-slate-300 dark:border-slate-600"
-            />
-            <div>
-                <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">{user.name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{user.role.replace('_', ' ')}</p>
+    const UserAvatar: React.FC = () => {
+        const avatarSrc = (user as any).avatarUrl 
+          ? ((user as any).avatarUrl.startsWith('http') 
+              ? (user as any).avatarUrl 
+              : (user as any).avatarUrl.startsWith('/')
+                ? `${window.location.origin}${(user as any).avatarUrl}`
+                : (user as any).avatarUrl)
+          : `https://i.pravatar.cc/150?u=${user.id}`;
+        
+        return (
+        <div className="user-menu-section">
+            <div className="user-avatar-container">
+                <img 
+                    src={avatarSrc} 
+                    alt={user.name}
+                    className="user-avatar-image"
+                    onError={(e) => {
+                      // Fallback to default avatar if image fails to load
+                      (e.target as HTMLImageElement).src = `https://i.pravatar.cc/150?u=${user.id}`;
+                    }}
+                />
+            </div>
+            <div className="user-info">
+                <p className="user-name">{user.name}</p>
+                <p className="user-role">{user.role.replace('_', ' ')}</p>
             </div>
         </div>
-    );
+        );
+    };
     
     return (
         <>
             <header className="dashboard-header">
-                <h1 className="text-xl font-bold text-slate-800 dark:text-slate-200">{title}</h1>
-                <div className="flex items-center gap-4">
+                <h1 className="text-lg font-bold text-slate-800 dark:text-slate-200" style={{ flex: '0 0 auto' }}>{title}</h1>
+                <div className="dashboard-header-right">
                     {user.organizations && user.organizations.length > 1 && onSwitchOrganization && (
                       <OrganizationSwitcher user={user} onSwitch={onSwitchOrganization} />
                     )}
@@ -61,11 +77,16 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = (props) => {
                         {isNotificationsOpen && <NotificationPanel notifications={props.notifications} onClose={() => setNotificationsOpen(false)} onMarkAllAsRead={props.onMarkNotificationsAsRead} />}
                     </div>
                     
-                    <UserAvatar />
-                    
-                    <button onClick={() => setSignOutModalOpen(true)} className="theme-toggle-button" aria-label="Sign Out">
-                        <Icons.LogOutIcon />
-                    </button>
+                    <div className="user-menu-wrapper">
+                        <UserAvatar />
+                        <button 
+                            onClick={() => setSignOutModalOpen(true)} 
+                            className="sign-out-button" 
+                            aria-label="Sign Out"
+                        >
+                            <Icons.LogOutIcon />
+                        </button>
+                    </div>
                 </div>
             </header>
              <ConfirmationModal

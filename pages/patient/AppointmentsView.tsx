@@ -3,7 +3,7 @@ import { Appointment, Room } from '../../types.ts';
 import { Button } from '../../components/common/Button.tsx';
 import { BookingModal } from './BookingModal.tsx';
 import { EmptyState } from '../../components/common/EmptyState.tsx';
-import { CalendarIcon } from '../../components/icons/index.tsx';
+import { CalendarIcon, ClockIcon, MapPinIcon, UserIcon } from '../../components/icons/index.tsx';
 import * as api from '../../services/apiService.ts';
 import { ConfirmationModal } from '../../components/common/ConfirmationModal.tsx';
 import { RescheduleModal } from '../../components/common/RescheduleModal.tsx';
@@ -50,61 +50,177 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ appointments
   const upcomingAppointments = appointments.filter(a => normalizeDate(a.date) >= today && a.status !== 'Completed' && a.status !== 'Cancelled');
   const pastAppointments = appointments.filter(a => normalizeDate(a.date) < today || a.status === 'Completed' || a.status === 'Cancelled');
 
+  const formatAppointmentDate = (date: string, time: string) => {
+    const appointmentDate = new Date(`${date}T${time}`);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const isToday = appointmentDate.toDateString() === today.toDateString();
+    const isTomorrow = appointmentDate.toDateString() === tomorrow.toDateString();
+    
+    if (isToday) return 'Today';
+    if (isTomorrow) return 'Tomorrow';
+    
+    return appointmentDate.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric',
+      year: appointmentDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+    });
+  };
+
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
   return (
     <>
-      <div className="flex justify-between items-center mb-6">
+      <div className="appointments-page-header">
         <div>
-            <h2 className="text-3xl font-bold text-text-primary">My Appointments</h2>
-            <p className="text-text-secondary">View your upcoming and past appointments.</p>
+          <h2 className="appointments-page-title">My Appointments</h2>
+          <p className="appointments-page-subtitle">View your upcoming and past appointments.</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>Book New Appointment</Button>
+        <button 
+          onClick={() => setIsModalOpen(true)} 
+          className="appointments-book-button"
+        >
+          <CalendarIcon className="w-5 h-5" />
+          <span>Book New Appointment</span>
+        </button>
       </div>
 
-      <div className="space-y-8">
-        <div>
-          <h3 className="text-xl font-semibold text-primary mb-3">Upcoming Appointments</h3>
-          <div className="content-card">
-            {upcomingAppointments.length > 0 ? (
-              <ul className="divide-y divide-border-primary">
-                {upcomingAppointments.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(appt => (
-                  <li key={appt.id} className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-text-primary">{appt.specialty} with {appt.doctorName}</p>
-                      <p className="text-sm text-text-secondary">{new Date(appt.date).toDateString()} at {appt.time} in <span className="font-medium">{appt.consultingRoomName}</span></p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button className="link-button" onClick={() => { setActiveAppt(appt); setConfirmOpen(true); }}>Cancel</button>
-                      <button className="link-button" onClick={() => { setActiveAppt(appt); setRescheduleOpen(true); }}>Reschedule</button>
-                      <span className="status-chip status-chip-cyan">{appt.status}</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState icon={CalendarIcon} title="No Upcoming Appointments" message="You can book a new appointment using the button above." />
+      <div className="appointments-sections">
+        <div className="appointments-section">
+          <div className="appointments-section-header">
+            <h3 className="appointments-section-title">Upcoming Appointments</h3>
+            {upcomingAppointments.length > 0 && (
+              <span className="appointments-count">{upcomingAppointments.length}</span>
             )}
           </div>
+          {upcomingAppointments.length > 0 ? (
+            <div className="appointments-grid">
+              {upcomingAppointments.sort((a,b) => {
+                const dateA = new Date(`${a.date}T${a.time}`).getTime();
+                const dateB = new Date(`${b.date}T${b.time}`).getTime();
+                return dateA - dateB;
+              }).map(appt => {
+                const appointmentDateTime = new Date(`${appt.date}T${appt.time}`);
+                const isUpcoming = appointmentDateTime > new Date();
+                
+                return (
+                  <div key={appt.id} className="appointment-card appointment-card-upcoming">
+                    <div className="appointment-card-header">
+                      <div className="appointment-date-badge">
+                        <CalendarIcon className="w-4 h-4" />
+                        <span>{formatAppointmentDate(appt.date, appt.time)}</span>
+                      </div>
+                      <span className={`appointment-status-badge appointment-status-${appt.status.toLowerCase()}`}>
+                        {appt.status}
+                      </span>
+                    </div>
+                    
+                    <div className="appointment-card-body">
+                      <div className="appointment-specialty">{appt.specialty}</div>
+                      <div className="appointment-doctor-info">
+                        <UserIcon className="w-4 h-4" />
+                        <span>{appt.doctorName}</span>
+                      </div>
+                      
+                      <div className="appointment-details">
+                        <div className="appointment-detail-item">
+                          <ClockIcon className="w-4 h-4" />
+                          <span>{formatTime(appt.time)}</span>
+                        </div>
+                        <div className="appointment-detail-item">
+                          <MapPinIcon className="w-4 h-4" />
+                          <span>{appt.consultingRoomName}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="appointment-card-actions">
+                      <button 
+                        className="appointment-action-button appointment-action-cancel"
+                        onClick={() => { setActiveAppt(appt); setConfirmOpen(true); }}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        className="appointment-action-button appointment-action-reschedule"
+                        onClick={() => { setActiveAppt(appt); setRescheduleOpen(true); }}
+                      >
+                        Reschedule
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="appointments-empty-state">
+              <EmptyState icon={CalendarIcon} title="No Upcoming Appointments" message="You can book a new appointment using the button above." />
+            </div>
+          )}
         </div>
         
-        <div>
-          <h3 className="text-xl font-semibold text-primary mb-3">Past Appointments</h3>
-           <div className="content-card">
-            {pastAppointments.length > 0 ? (
-              <ul className="divide-y divide-border-primary">
-                {pastAppointments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(appt => (
-                  <li key={appt.id} className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-text-primary">{appt.specialty} with {appt.doctorName}</p>
-                      <p className="text-sm text-text-secondary">{new Date(appt.date).toDateString()} at {appt.time}</p>
-                    </div>
-                    <span className="status-chip status-chip-slate">{appt.status}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState icon={CalendarIcon} title="No Past Appointments" message="Your completed appointment history will appear here." />
+        <div className="appointments-section">
+          <div className="appointments-section-header">
+            <h3 className="appointments-section-title">Past Appointments</h3>
+            {pastAppointments.length > 0 && (
+              <span className="appointments-count">{pastAppointments.length}</span>
             )}
           </div>
+          {pastAppointments.length > 0 ? (
+            <div className="appointments-grid">
+              {pastAppointments.sort((a,b) => {
+                const dateA = new Date(`${a.date}T${a.time}`).getTime();
+                const dateB = new Date(`${b.date}T${b.time}`).getTime();
+                return dateB - dateA;
+              }).map(appt => (
+                <div key={appt.id} className="appointment-card appointment-card-past">
+                  <div className="appointment-card-header">
+                    <div className="appointment-date-badge">
+                      <CalendarIcon className="w-4 h-4" />
+                      <span>{formatAppointmentDate(appt.date, appt.time)}</span>
+                    </div>
+                    <span className={`appointment-status-badge appointment-status-${appt.status.toLowerCase()}`}>
+                      {appt.status}
+                    </span>
+                  </div>
+                  
+                  <div className="appointment-card-body">
+                    <div className="appointment-specialty">{appt.specialty}</div>
+                    <div className="appointment-doctor-info">
+                      <UserIcon className="w-4 h-4" />
+                      <span>{appt.doctorName}</span>
+                    </div>
+                    
+                    <div className="appointment-details">
+                      <div className="appointment-detail-item">
+                        <ClockIcon className="w-4 h-4" />
+                        <span>{formatTime(appt.time)}</span>
+                      </div>
+                      {appt.consultingRoomName && (
+                        <div className="appointment-detail-item">
+                          <MapPinIcon className="w-4 h-4" />
+                          <span>{appt.consultingRoomName}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="appointments-empty-state">
+              <EmptyState icon={CalendarIcon} title="No Past Appointments" message="Your completed appointment history will appear here." />
+            </div>
+          )}
         </div>
       </div>
 

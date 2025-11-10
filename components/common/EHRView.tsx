@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Patient, LabTest, ClinicalNote, User, Prescription, Referral, CarePlan, CarePlanAdherence, DiagnosticSuggestion, LifestyleRecommendation, ReferralSuggestion } from '../../types.ts';
 import { Button } from './Button.tsx';
-import { SparklesIcon, TargetIcon, MicroscopeIcon, DietIcon, RepeatIcon, DownloadCloudIcon } from '../icons/index.tsx';
+import { SparklesIcon, TargetIcon, MicroscopeIcon, DietIcon, RepeatIcon, DownloadCloudIcon, FileTextIcon, CalendarIcon, UserIcon, ClockIcon, CheckCircleIcon, AlertCircleIcon } from '../icons/index.tsx';
 import { AISummaryModal } from './AISummaryModal.tsx';
 import * as geminiService from '../../services/geminiService.ts';
 import { ClinicalNoteModal } from '../hcw/ClinicalNoteModal.tsx';
@@ -232,118 +232,254 @@ export const EHRView: React.FC<EHRViewProps> = (props) => {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-3xl font-bold text-text-primary">Electronic Health Record</h2>
-          <p className="text-text-secondary">Patient: {props.patient.name} (ID: {props.patient.id})</p>
+      <div className="ehr-page-header">
+        <div className="ehr-header-content">
+          <div className="ehr-header-icon-wrapper">
+            <FileTextIcon className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="ehr-page-title">Medical Records</h2>
+            <p className="ehr-page-subtitle">{props.patient.name} • Patient ID: {props.patient.id}</p>
+          </div>
         </div>
-        <div className="ehr-actions">
-          <div className="ehr-action-left">
-            {props.onBack && <Button onClick={props.onBack}>&larr; Back to Patients</Button>}
-          </div>
-          <div className="ehr-action-buttons">
-            <Button onClick={props.onDownload} aria-label="Download medical record PDF">
-              <DownloadCloudIcon className="w-5 h-5 mr-2" />
-              Download PDF
-            </Button>
-            {canAccessFeature(props.currentUser, 'ai_summary') && (
-              <Button onClick={handleGenerateSummary} style={{ backgroundColor: 'var(--violet-500)', color: 'white' }}>
-                <SparklesIcon className="w-5 h-5 mr-2" />
-                AI Summary
-              </Button>
-            )}
-          </div>
+        <div className="ehr-header-actions">
+          {props.onBack && (
+            <button onClick={props.onBack} className="ehr-back-button">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span>Back</span>
+            </button>
+          )}
+          <button onClick={props.onDownload} className="ehr-download-button" aria-label="Download medical record PDF">
+            <DownloadCloudIcon className="w-5 h-5" />
+            <span>Download PDF</span>
+          </button>
+          {canAccessFeature(props.currentUser, 'ai_summary') && (
+            <button onClick={handleGenerateSummary} className="ehr-ai-button">
+              <SparklesIcon className="w-5 h-5" />
+              <span>AI Summary</span>
+            </button>
+          )}
         </div>
       </div>
       
       {isHcw && (
-        <div className="mb-6 p-4 bg-background-secondary border border-border-primary rounded-lg flex flex-wrap gap-4 justify-center">
-            <Button onClick={() => setNoteModalOpen(true)}>Add Clinical Note</Button>
-            {canAccessFeature(props.currentUser, 'prescribing') && <Button onClick={() => setRxModalOpen(true)}>Create Prescription</Button>}
-            {canAccessFeature(props.currentUser, 'lab') && <Button onClick={() => setLabModalOpen(true)}>Order Lab Test</Button>}
-            <Button onClick={() => setReferralModalOpen(true)}>Refer Patient</Button>
+        <div className="ehr-quick-actions">
+          <button onClick={() => setNoteModalOpen(true)} className="ehr-quick-action-button">
+            <FileTextIcon className="w-4 h-4" />
+            <span>Add Note</span>
+          </button>
+          {canAccessFeature(props.currentUser, 'prescribing') && (
+            <button onClick={() => setRxModalOpen(true)} className="ehr-quick-action-button">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+              <span>Prescription</span>
+            </button>
+          )}
+          {canAccessFeature(props.currentUser, 'lab') && (
+            <button onClick={() => setLabModalOpen(true)} className="ehr-quick-action-button">
+              <MicroscopeIcon className="w-4 h-4" />
+              <span>Lab Test</span>
+            </button>
+          )}
+          <button onClick={() => setReferralModalOpen(true)} className="ehr-quick-action-button">
+            <RepeatIcon className="w-4 h-4" />
+            <span>Referral</span>
+          </button>
         </div>
       )}
 
-      <div className="space-y-6">
-         {/* Demographics */}
-        <div className="content-card">
-            <h3 className="card-header p-6 font-semibold text-lg text-text-primary">Patient Information</h3>
-            <div className="p-6 pt-0 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div><p className="font-semibold text-text-secondary">Full Name</p><p>{props.patient.name}</p></div>
-                <div><p className="font-semibold text-text-secondary">Date of Birth</p><p>{props.patient.dateOfBirth}</p></div>
-                <div><p className="font-semibold text-text-secondary">Email</p><p>{props.patient.email}</p></div>
-                <div><p className="font-semibold text-text-secondary">Last Visit</p><p>{props.patient.lastVisit}</p></div>
+      <div className="ehr-content-grid">
+        {/* Patient Information Card */}
+        <div className="ehr-section-card">
+          <div className="ehr-section-header">
+            <div className="ehr-section-icon">
+              <UserIcon className="w-5 h-5" />
             </div>
+            <h3 className="ehr-section-title">Patient Information</h3>
+          </div>
+          <div className="ehr-patient-info">
+            <div className="ehr-info-item">
+              <span className="ehr-info-label">Full Name</span>
+              <span className="ehr-info-value">{props.patient.name}</span>
+            </div>
+            <div className="ehr-info-item">
+              <span className="ehr-info-label">Date of Birth</span>
+              <span className="ehr-info-value">{props.patient.dateOfBirth || 'Not provided'}</span>
+            </div>
+            <div className="ehr-info-item">
+              <span className="ehr-info-label">Email</span>
+              <span className="ehr-info-value">{props.patient.email}</span>
+            </div>
+            {props.patient.lastVisit && (
+              <div className="ehr-info-item">
+                <span className="ehr-info-label">Last Visit</span>
+                <span className="ehr-info-value">{props.patient.lastVisit}</span>
+              </div>
+            )}
+          </div>
         </div>
         
         {/* AI Proactive Care & Recommendation Modules */}
         {isHcw && activeCarePlan && !generatedPlan && (
-            <div className="content-card">
-                <div className="p-6">
-                <h3 className="font-semibold text-lg text-text-primary">Current Proactive Care Plan</h3>
-                
-                <CarePlanDisplay plan={activeCarePlan} />
-                
-                {props.carePlanAdherence && (
-                    <div className="mt-6 text-center border-t border-border-primary pt-6">
-                        <Button onClick={() => setShowAdherence(!showAdherence)} style={{backgroundColor: 'var(--teal-700)'}}>
-                            <TargetIcon className="w-5 h-5 mr-2" />
-                            {showAdherence ? 'Hide Adherence Report' : 'View Adherence Report'}
-                        </Button>
+            <div className="ehr-section-card ehr-section-card-full">
+                <div className="ehr-section-header">
+                    <div className="ehr-section-icon">
+                        <TargetIcon className="w-5 h-5" />
                     </div>
-                )}
+                    <h3 className="ehr-section-title">Current Proactive Care Plan</h3>
+                </div>
+                <div className="ehr-care-plan-content">
+                    <CarePlanDisplay plan={activeCarePlan} />
+                    
+                    {props.carePlanAdherence && (
+                        <div className="ehr-adherence-toggle">
+                            <button 
+                                onClick={() => setShowAdherence(!showAdherence)} 
+                                className="ehr-adherence-button"
+                            >
+                                <TargetIcon className="w-4 h-4" />
+                                <span>{showAdherence ? 'Hide Adherence Report' : 'View Adherence Report'}</span>
+                            </button>
+                        </div>
+                    )}
 
-                {showAdherence && props.carePlanAdherence && (
-                    <CarePlanAdherenceView plan={activeCarePlan} adherence={props.carePlanAdherence} />
-                )}
+                    {showAdherence && props.carePlanAdherence && (
+                        <div className="ehr-adherence-content">
+                            <CarePlanAdherenceView plan={activeCarePlan} adherence={props.carePlanAdherence} />
+                        </div>
+                    )}
                 </div>
             </div>
         )}
         
         {isHcw && canAccessFeature(props.currentUser, 'ai_proactive_care') && (
-            <div className="content-card">
-                <div className="p-6">
-                    <h3 className="font-semibold text-lg text-text-primary">AI Recommendation Assistant</h3>
+            <div className="ehr-section-card ehr-section-card-full">
+                <div className="ehr-section-header">
+                    <div className="ehr-section-icon">
+                        <SparklesIcon className="w-5 h-5" />
+                    </div>
+                    <h3 className="ehr-section-title">AI Recommendation Assistant</h3>
+                </div>
+                <div className="ehr-ai-assistant-content">
                     {renderWizardContent()}
                 </div>
             </div>
         )}
 
 
-        {/* Clinical Notes */}
-        <div className="content-card">
-            <h3 className="card-header p-6 font-semibold text-lg text-text-primary">Clinical Notes</h3>
-            <div className="p-6 pt-0 space-y-4">
-               {props.clinicalNotes.map(note => (
-                    <div key={note.id} className="p-4 bg-background-tertiary rounded-md">
-                        <p className="text-sm font-semibold text-text-secondary">
-                            {new Date(note.date).toDateString()} - Dr. {note.doctorName}
-                        </p>
-                        <p className="whitespace-pre-wrap mt-2 text-sm">{note.content}</p>
-                    </div>
-                ))}
-                 {props.clinicalNotes.length === 0 && <p className="text-text-secondary text-center py-4">No clinical notes recorded.</p>}
+        {/* Clinical Notes Section */}
+        <div className="ehr-section-card ehr-section-card-full">
+          <div className="ehr-section-header">
+            <div className="ehr-section-icon">
+              <FileTextIcon className="w-5 h-5" />
             </div>
+            <h3 className="ehr-section-title">Clinical Notes</h3>
+            <span className="ehr-section-count">{props.clinicalNotes.length}</span>
+          </div>
+          <div className="ehr-clinical-notes">
+            {props.clinicalNotes.length > 0 ? (
+              props.clinicalNotes.map(note => {
+                const noteDate = new Date(note.date);
+                const isRecent = (Date.now() - noteDate.getTime()) < 7 * 24 * 60 * 60 * 1000; // Within 7 days
+                
+                return (
+                  <div key={note.id} className={`ehr-note-card ${isRecent ? 'ehr-note-recent' : ''}`}>
+                    <div className="ehr-note-header">
+                      <div className="ehr-note-date">
+                        <CalendarIcon className="w-4 h-4" />
+                        <span>{noteDate.toLocaleDateString('en-US', { 
+                          weekday: 'short', 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })}</span>
+                      </div>
+                      <div className="ehr-note-doctor">
+                        <UserIcon className="w-4 h-4" />
+                        <span>Dr. {note.doctorName}</span>
+                      </div>
+                    </div>
+                    <div className="ehr-note-content">
+                      <p>{note.content}</p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="ehr-empty-state">
+                <FileTextIcon className="w-12 h-12" />
+                <p className="ehr-empty-title">No Clinical Notes</p>
+                <p className="ehr-empty-message">Clinical notes will appear here once they are added to your record.</p>
+              </div>
+            )}
+          </div>
         </div>
         
-        {/* Lab Test Results */}
-        <div className="content-card">
-          <h3 className="card-header p-6 font-semibold text-lg text-text-primary">Lab Test Results</h3>
-          <table className="styled-table">
-            <thead><tr><th>Date</th><th>Test Name</th><th>Result</th><th>Status</th></tr></thead>
-            <tbody>
-              {props.labTests.map(test => (
-                <tr key={test.id}>
-                  <td>{test.dateOrdered}</td>
-                  <td>{test.testName}</td>
-                  <td className="font-mono">{test.result || 'Pending'}</td>
-                  <td><span className="status-chip status-chip-slate">{test.status}</span></td>
-                </tr>
-              ))}
-               {props.labTests.length === 0 && <tr><td colSpan={4} className="text-center text-text-secondary py-8">No lab tests found.</td></tr>}
-            </tbody>
-          </table>
+        {/* Lab Test Results Section */}
+        <div className="ehr-section-card ehr-section-card-full">
+          <div className="ehr-section-header">
+            <div className="ehr-section-icon">
+              <MicroscopeIcon className="w-5 h-5" />
+            </div>
+            <h3 className="ehr-section-title">Lab Test Results</h3>
+            <span className="ehr-section-count">{props.labTests.length}</span>
+          </div>
+          <div className="ehr-lab-tests">
+            {props.labTests.length > 0 ? (
+              props.labTests.map(test => {
+                const isCompleted = test.status === 'Completed';
+                const isPending = test.status === 'Pending';
+                const isAbnormal = test.result && (
+                  test.result.toLowerCase().includes('high') || 
+                  test.result.toLowerCase().includes('low') ||
+                  test.result.toLowerCase().includes('abnormal')
+                );
+                
+                return (
+                  <div key={test.id} className={`ehr-lab-test-card ${isAbnormal ? 'ehr-lab-test-abnormal' : ''}`}>
+                    <div className="ehr-lab-test-header">
+                      <div className="ehr-lab-test-name">
+                        {isCompleted ? (
+                          isAbnormal ? (
+                            <AlertCircleIcon className="w-5 h-5" />
+                          ) : (
+                            <CheckCircleIcon className="w-5 h-5" />
+                          )
+                        ) : (
+                          <ClockIcon className="w-5 h-5" />
+                        )}
+                        <div>
+                          <h4 className="ehr-lab-test-title">{test.testName}</h4>
+                          <p className="ehr-lab-test-date">
+                            <CalendarIcon className="w-3 h-3" />
+                            <span>Ordered: {test.dateOrdered}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`ehr-lab-test-status ehr-lab-test-status-${test.status.toLowerCase()}`}>
+                        {test.status}
+                      </span>
+                    </div>
+                    {test.result && (
+                      <div className="ehr-lab-test-result">
+                        <span className="ehr-lab-test-result-label">Result:</span>
+                        <span className="ehr-lab-test-result-value">{test.result}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="ehr-empty-state">
+                <MicroscopeIcon className="w-12 h-12" />
+                <p className="ehr-empty-title">No Lab Tests</p>
+                <p className="ehr-empty-message">Lab test results will appear here once they are ordered and completed.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
