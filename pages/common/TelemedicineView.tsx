@@ -87,7 +87,7 @@ export const TelemedicineView: React.FC<TelemedicineViewProps> = ({ onEndCall, p
     // For HCW, generate AI note from transcript
     if (doctorName) { // Simple check if this is the doctor's view
         try {
-            const note = await geminiService.generateNoteFromTranscript(mockTranscript);
+            const note = await geminiService.generateEHRSummary(mockTranscript);
             onEndCall(note);
         } catch (error) {
             console.error("Failed to generate note", error);

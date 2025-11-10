@@ -29,7 +29,7 @@ const AdherenceItem: React.FC<{ item: CarePlanAdherence['details'][0] }> = ({ it
     );
 };
 
-export const CarePlanAdherenceView: React.FC<CarePlanAdherenceViewProps> = ({ plan, adherence }) => {
+export const CarePlanAdherenceView: React.FC<CarePlanAdherenceViewProps> = ({ plan: _plan, adherence }) => {
     const scoreColor = adherence.adherenceScore > 75 ? 'bg-green-500' : adherence.adherenceScore > 50 ? 'bg-amber-500' : 'bg-red-500';
 
     return (

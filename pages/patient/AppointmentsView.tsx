@@ -36,8 +36,19 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ appointments
     }
   };
 
-  const upcomingAppointments = appointments.filter(a => new Date(a.date) >= new Date() && a.status !== 'Completed' && a.status !== 'Cancelled');
-  const pastAppointments = appointments.filter(a => new Date(a.date) < new Date() || a.status === 'Completed' || a.status === 'Cancelled');
+  const normalizeDate = (value: string) => {
+    const parsed = new Date(value);
+    parsed.setHours(0, 0, 0, 0);
+    return parsed.getTime();
+  };
+  const today = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  })();
+
+  const upcomingAppointments = appointments.filter(a => normalizeDate(a.date) >= today && a.status !== 'Completed' && a.status !== 'Cancelled');
+  const pastAppointments = appointments.filter(a => normalizeDate(a.date) < today || a.status === 'Completed' || a.status === 'Cancelled');
 
   return (
     <>

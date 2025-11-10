@@ -28,7 +28,7 @@ describe('AppointmentsView', () => {
   const onSuggestionHandled = vi.fn();
 
   it('renders upcoming and past appointments correctly', () => {
-    renderWithProvider(<AppointmentsView appointments={mockAppointments} onBookAppointment={onBookAppointment} onSuggestionHandled={onSuggestionHandled} />);
+    renderWithProvider(<AppointmentsView appointments={mockAppointments} rooms={[]} onBookAppointment={onBookAppointment} onSuggestionHandled={onSuggestionHandled} />);
     
     // Check for Upcoming Appointments section
     const upcomingSection = screen.getByText('Upcoming Appointments').closest('div');
@@ -43,14 +43,14 @@ describe('AppointmentsView', () => {
   });
 
   it('shows no appointments message when lists are empty', () => {
-    renderWithProvider(<AppointmentsView appointments={[]} onBookAppointment={onBookAppointment} onSuggestionHandled={onSuggestionHandled} />);
+    renderWithProvider(<AppointmentsView appointments={[]} rooms={[]} onBookAppointment={onBookAppointment} onSuggestionHandled={onSuggestionHandled} />);
     expect(screen.getByText('No Upcoming Appointments')).toBeInTheDocument();
     expect(screen.getByText('No Past Appointments')).toBeInTheDocument();
   });
 
   it('opens the booking modal when "Book New Appointment" is clicked', async () => {
     const user = userEvent.setup();
-    renderWithProvider(<AppointmentsView appointments={[]} onBookAppointment={onBookAppointment} onSuggestionHandled={onSuggestionHandled} />);
+    renderWithProvider(<AppointmentsView appointments={[]} rooms={[]} onBookAppointment={onBookAppointment} onSuggestionHandled={onSuggestionHandled} />);
     
     await user.click(screen.getByRole('button', { name: 'Book New Appointment' }));
 
@@ -59,7 +59,7 @@ describe('AppointmentsView', () => {
   });
 
   it('opens the booking modal with a suggested specialty', () => {
-    renderWithProvider(<AppointmentsView appointments={[]} onBookAppointment={onBookAppointment} onSuggestionHandled={onSuggestionHandled} suggestedSpecialty="Cardiology" />);
+    renderWithProvider(<AppointmentsView appointments={[]} rooms={[]} onBookAppointment={onBookAppointment} onSuggestionHandled={onSuggestionHandled} suggestedSpecialty="Cardiology" />);
     
     expect(screen.getByRole('heading', { name: 'Book a New Appointment' })).toBeInTheDocument();
     // Check if the select dropdown has the suggested value

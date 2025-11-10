@@ -7,7 +7,7 @@ import type { VitalTrendAlert } from '../types';
 
 export type RunModelPayload = { model: string; contents: string; config?: any };
 
-async function callAiProxy(payload: RunModelPayload): Promise<string> {
+async function callAiProxy(payload: RunModelPayload): Promise<any> {
   const url = `${API_BASE_URL}/api/ai/generate`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000); // 15s timeout for AI
@@ -28,7 +28,11 @@ async function callAiProxy(payload: RunModelPayload): Promise<string> {
   }
 
   if (!raw) return '';
-  try { const json = JSON.parse(raw); return (json.text ?? json.output ?? '') as string; } catch { 
+  try { 
+    const json = JSON.parse(raw); 
+    const candidate = json.text ?? json.output ?? json;
+    return candidate;
+  } catch { 
     // If backend returned raw text (dev stub), return it as-is.
     return raw;
   }
@@ -135,9 +139,16 @@ export async function generateCoachingMessage(patient: any, carePlan: any) {
 
   // If the dev stub simply echoed the prompt or returned JSON, fall back to a simple local message
   const looksLikeJsonEcho = /^\s*\{/.test(cleaned) || cleaned.includes(JSON.stringify(patient).slice(0, 40));
+  const looksLikePromptEcho = cleaned.includes('You are a friendly health coach') || cleaned.includes('Given the patient record');
   if (looksLikeJsonEcho) {
     const name = patient?.name ? String(patient.name).split(' ')[0] : 'there';
     return `Hi ${name}, small steps make a big difference — follow your care plan, take medications as prescribed, and contact your care team if you notice any new or worsening symptoms.`;
+  }
+
+  if (looksLikePromptEcho) {
+    const name = patient?.name ? String(patient.name).split(' ')[0] : 'there';
+    const diet = carePlan?.lifestyleRecommendations?.[0]?.recommendation || 'eat balanced meals and stay hydrated';
+    return `Hi ${name}, you're already making progress! Keep ${diet.toLowerCase()}, stay active with small daily movements, and check in with your care team if anything feels off. You've got this.`;
   }
 
   return cleaned;

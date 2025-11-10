@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Patient, WearableDataPoint } from '../../types.ts';
+import { Patient } from '../../types.ts';
 import { HeartPulseIcon, StepIcon, MoonIcon, RefreshCwIcon } from '../../components/icons/index.tsx';
 import { Button } from '../../components/common/Button.tsx';
 import { ConfirmationModal } from '../../components/common/ConfirmationModal.tsx';
@@ -53,7 +53,7 @@ export const WearablesView: React.FC<WearablesViewProps> = ({ patient, onSimulat
     const [isSimulating, setIsSimulating] = useState(false);
     const [isModalOpen, setModalOpen] = useState(false);
     const [deviceToRemove, setDeviceToRemove] = useState<string | null>(null);
-    const [isRemoving, setIsRemoving] = useState(false);
+    const [_isRemoving, setIsRemoving] = useState(false);
 
     const handleSimulation = async () => {
         setIsSimulating(true);

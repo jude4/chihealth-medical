@@ -1,97 +1,74 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runChat, getTriageSuggestion } from './geminiService';
 
-// Mock the entire @google/genai library
-const mockGenerateContent = vi.fn();
-vi.mock('@google/genai', () => {
-  const mockGoogleGenAI = vi.fn(() => ({
-    models: {
-      generateContent: mockGenerateContent,
-    },
-  }));
-
-  return {
-    GoogleGenAI: mockGoogleGenAI,
-    // We need to export any enums or types used by the service
-    Type: {
-      OBJECT: 'OBJECT',
-      ARRAY: 'ARRAY',
-      STRING: 'STRING',
-      NUMBER: 'NUMBER',
-      INTEGER: 'INTEGER',
-      BOOLEAN: 'BOOLEAN',
-    }
-  };
+const buildResponse = (text: string, init?: { ok?: boolean; status?: number; contentType?: string }) => ({
+  ok: init?.ok ?? true,
+  status: init?.status ?? 200,
+  headers: {
+    get: vi.fn().mockImplementation((key: string) => (key.toLowerCase() === 'content-type' ? init?.contentType ?? 'application/json' : null)),
+  },
+  text: vi.fn().mockResolvedValue(text),
 });
 
-
 describe('geminiService', () => {
-  
+  const fetchSpy = vi.fn();
+  const originalFetch = global.fetch;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    fetchSpy.mockReset();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
   });
 
   describe('runChat', () => {
-    it('should call generateContent with the correct model and a formatted prompt', async () => {
-      const mockResponse = { text: 'This is a mock response.' };
-      mockGenerateContent.mockResolvedValue(mockResponse);
+    it('posts the prompt to the AI proxy and returns the response text', async () => {
+      const expectedText = 'Hello from AI';
+      fetchSpy.mockResolvedValue(buildResponse(JSON.stringify({ text: expectedText })));
 
-      const userPrompt = 'hello world';
-      const result = await runChat(userPrompt);
+      const prompt = 'How are you?';
+      const result = await runChat(prompt);
 
-      expect(mockGenerateContent).toHaveBeenCalledWith({
-        model: 'gemini-2.5-flash',
-        contents: expect.stringContaining(`The user is asking the following: "${userPrompt}"`),
-      });
-      
-      expect(result).toBe(mockResponse.text);
-    });
-
-     it('should return the text from the API response', async () => {
-      const expectedText = 'AI says hello!';
-      mockGenerateContent.mockResolvedValue({ text: expectedText });
-      
-      const result = await runChat('anything');
-      
+      expect(fetchSpy).toHaveBeenCalledWith(expect.stringContaining('/api/ai/generate'), expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }));
+      const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+      expect(body).toMatchObject({ model: 'gemini-2.5-flash', contents: prompt });
       expect(result).toBe(expectedText);
     });
-  });
-  
-  describe('getTriageSuggestion', () => {
-    it('should call generateContent with JSON mime type and parse the result', async () => {
-      const mockSuggestion = {
-        recommendation: 'appointment',
-        reasoning: 'Symptoms are moderate.',
-        specialty: 'General Practice',
-      };
-      const mockResponse = { text: JSON.stringify(mockSuggestion) };
-      mockGenerateContent.mockResolvedValue(mockResponse);
 
-      const symptoms = 'feeling tired';
-      const result = await getTriageSuggestion(symptoms);
-      
-      expect(mockGenerateContent).toHaveBeenCalledWith({
-        model: 'gemini-2.5-flash',
-        contents: expect.stringContaining(`"${symptoms}"`),
-        config: {
-          responseMimeType: 'application/json',
-        },
+    it('throws when the proxy responds with an error', async () => {
+      fetchSpy.mockResolvedValue(buildResponse('boom', { ok: false, status: 500 }));
+
+      await expect(runChat('test')).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getTriageSuggestion', () => {
+    it('returns parsed JSON when the proxy responds with structured data', async () => {
+      const payload = JSON.stringify({ recommendation: 'appointment' });
+      fetchSpy.mockResolvedValue(buildResponse(payload));
+
+      const result = await getTriageSuggestion('symptom details');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ recommendation: 'appointment' });
+    });
+
+    it('returns empty string when proxy responds with no body', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: vi.fn().mockReturnValue('application/json') },
+        text: vi.fn().mockResolvedValue(''),
       });
 
-      expect(result).toEqual(mockSuggestion);
-    });
-    
-     it('should return null if the JSON is malformed', async () => {
-      const mockResponse = { text: 'this is not json' };
-      mockGenerateContent.mockResolvedValue(mockResponse);
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const result = await getTriageSuggestion('headache');
-      
-      expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      
-      consoleErrorSpy.mockRestore();
+      const result = await getTriageSuggestion('symptom');
+      expect(result).toBe('');
     });
   });
 });

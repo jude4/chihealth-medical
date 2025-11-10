@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '../../components/common/Button.tsx';
-import { CheckIcon, LockIcon } from '../../components/icons/index.tsx';
+import { CheckIcon } from '../../components/icons/index.tsx';
 
 const planDetails = {
     name: 'Professional Hospital',

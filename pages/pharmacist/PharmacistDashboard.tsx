@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Prescription, Patient } from '../../types.ts';
+import { User, Prescription } from '../../types.ts';
 import * as api from '../../services/apiService.ts';
 import { useToasts } from '../../hooks/useToasts.ts';
 import * as Icons from '../../components/icons/index.tsx';
@@ -80,7 +80,6 @@ const PharmacistDashboard: React.FC<PharmacistDashboardProps> = (props) => {
     setSafetyCheckResult(null);
     try {
       const rx = data.prescriptions.find((p: Prescription) => p.id === prescriptionId);
-      const patient = data.patients.find((p: Patient) => p.id === rx.patientId);
       const patientPrescriptions = data.prescriptions.filter((p: Prescription) => p.patientId === rx.patientId && p.id !== rx.id && p.status === 'Active');
       
       const result = await runPharmacySafetyCheck(rx.medication, patientPrescriptions.map((p: Prescription) => p.medication));

@@ -12,7 +12,7 @@ interface ClinicalNoteModalProps {
   initialContent?: string;
 }
 
-export const ClinicalNoteModal: React.FC<ClinicalNoteModalProps> = ({ isOpen, onClose, patient, doctor, onSave, initialContent }) => {
+export const ClinicalNoteModal: React.FC<ClinicalNoteModalProps> = ({ isOpen, onClose, patient, doctor: _doctor, onSave, initialContent }) => {
   const [content, setContent] = useState(initialContent || '');
   const [isLoading, setIsLoading] = useState(false);
 

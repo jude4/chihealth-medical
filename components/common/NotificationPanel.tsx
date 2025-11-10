@@ -25,7 +25,7 @@ const formatTimeAgo = (timestamp: string): string => {
     return Math.floor(seconds) + "s ago";
 };
 
-export const NotificationPanel: React.FC<NotificationPanelProps> = ({ notifications, onClose, onMarkAllAsRead }) => {
+export const NotificationPanel: React.FC<NotificationPanelProps> = ({ notifications, onClose: _onClose, onMarkAllAsRead }) => {
     return (
         <div className="notification-panel">
             <div className="notification-panel-header">

@@ -1,13 +1,12 @@
 // Fix: Add React import for JSX usage in test file.
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthForm } from './AuthForm.tsx';
 import * as authService from '../../services/authService.ts';
 import * as api from '../../services/apiService.ts';
-import { Patient, User } from '../../types.ts';
-import { useToasts } from '../../hooks/useToasts.ts';
+import { User } from '../../types.ts';
 import { ToastProvider } from '../../contexts/ToastContext.tsx';
 
 // Mock the services
@@ -42,7 +41,7 @@ describe('AuthForm', () => {
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
     // Check for the submit button specifically
     const submitButtons = screen.getAllByRole('button');
-    expect(submitButtons.find(b => b.textContent === 'Create Account' && b.type !== 'button')).toBeUndefined();
+    expect(submitButtons.find(b => b.textContent === 'Create Account' && (b as HTMLButtonElement).type !== 'button')).toBeUndefined();
   });
 
   it('switches to the Create Account form when tab is clicked', async () => {
@@ -53,13 +52,13 @@ describe('AuthForm', () => {
     
     // Check for the submit button specifically
     const submitButtons = screen.getAllByRole('button');
-    expect(submitButtons.find(b => b.textContent === 'Create Account' && b.type === 'submit')).toBeInTheDocument();
-    expect(submitButtons.find(b => b.textContent === 'Sign In' && b.type === 'submit')).toBeUndefined();
+    expect(submitButtons.find(b => b.textContent === 'Create Account' && (b as HTMLButtonElement).type === 'submit')).toBeInTheDocument();
+    expect(submitButtons.find(b => b.textContent === 'Sign In' && (b as HTMLButtonElement).type === 'submit')).toBeUndefined();
   });
 
   it('handles successful login', async () => {
     const user = userEvent.setup();
-    (authService.signInWithEmail as vi.Mock).mockResolvedValue({ user: mockUser, token: 'fake-token' });
+    (authService.signInWithEmail as any).mockResolvedValue({ user: mockUser, token: 'fake-token' });
 
     renderWithProvider(<AuthForm onSsoSuccess={onSsoSuccess} onForgotPassword={onForgotPassword} onAuthSuccess={onAuthSuccess} />);
 
@@ -74,7 +73,7 @@ describe('AuthForm', () => {
   
   it('displays an error message on failed login', async () => {
     const user = userEvent.setup();
-    (authService.signInWithEmail as vi.Mock).mockRejectedValue(new Error('Invalid email or password.'));
+    (authService.signInWithEmail as any).mockRejectedValue(new Error('Invalid email or password.'));
 
     renderWithProvider(<AuthForm onSsoSuccess={onSsoSuccess} onForgotPassword={onForgotPassword} onAuthSuccess={onAuthSuccess} />);
     
@@ -88,7 +87,7 @@ describe('AuthForm', () => {
 
   it('handles successful registration and notifies user', async () => {
     const user = userEvent.setup();
-    (authService.registerWithEmail as vi.Mock).mockResolvedValue({ user: mockUser });
+    (authService.registerWithEmail as any).mockResolvedValue({ user: mockUser });
 
     renderWithProvider(<AuthForm onSsoSuccess={onSsoSuccess} onForgotPassword={onForgotPassword} onAuthSuccess={onAuthSuccess} />);
     

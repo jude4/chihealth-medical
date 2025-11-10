@@ -47,7 +47,7 @@ const parseMarkdown = (text: string): string => {
     html = html.replace(/\n/g, '<br />');
     // Remove <br> inside lists and pre blocks
     html = html.replace(/<ul><br \/>/g, '<ul>').replace(/<br \/>\n<\/ul>/g, '</ul>');
-    html = html.replace(/<pre>(.*?)<\/pre>/gs, (match, content) => `<pre>${content.replace(/<br \s*\/?>/g, '\n')}</pre>`);
+    html = html.replace(/<pre>(.*?)<\/pre>/gs, (_m, content) => `<pre>${content.replace(/<br \s*\/?>/g, '\n')}</pre>`);
 
     return html;
 };

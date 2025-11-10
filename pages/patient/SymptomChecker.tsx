@@ -74,8 +74,10 @@ export const SymptomChecker: React.FC<SymptomCheckerProps> = ({ onBookAppointmen
 
       // Get structured triage suggestion in the background
       const suggestion = await getTriageSuggestion(currentInput);
-      if (suggestion && suggestion.recommendation === 'appointment') {
-        setAiSuggestion(suggestion);
+      let parsed: any = suggestion;
+      try { parsed = typeof suggestion === 'string' ? JSON.parse(suggestion) : suggestion; } catch {}
+      if (parsed && parsed.recommendation === 'appointment') {
+        setAiSuggestion(parsed as TriageSuggestion);
       }
     } catch (err) {
       console.error(err);

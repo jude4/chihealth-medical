@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from "@vitejs/plugin-react";
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -47,5 +47,6 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: "./setupTests.ts",
+    exclude: ["e2e/**/*", "backend/**/*"]
   },
 });

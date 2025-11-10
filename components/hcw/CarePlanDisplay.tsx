@@ -49,9 +49,9 @@ export const CarePlanDisplay: React.FC<CarePlanDisplayProps> = ({ plan }) => {
                         </li>
                     ))}
                 </Section>
-                {plan.diagnosticSuggestions?.length > 0 && (
+                {(plan.diagnosticSuggestions?.length ?? 0) > 0 && (
                      <Section title="Diagnostic Suggestions" icon={MicroscopeIcon}>
-                         {plan.diagnosticSuggestions.map((item, index) => (
+                         {plan.diagnosticSuggestions?.map((item, index) => (
                             <li key={index} className="care-plan-item">
                                 <strong>{item.testName}</strong>
                                 <p>Reason: {item.reason}</p>

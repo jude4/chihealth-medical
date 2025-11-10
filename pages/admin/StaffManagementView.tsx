@@ -3,7 +3,6 @@ import { User, UserRole, Organization, Department } from '../../types.ts';
 import { Button } from '../../components/common/Button.tsx';
 import { EditStaffModal } from './EditStaffModal.tsx';
 import { EmptyState } from '../../components/common/EmptyState.tsx';
-import { canAccessFeature } from '../../services/permissionService.ts';
 import { UsersIcon } from '../../components/icons/index.tsx';
 
 interface StaffManagementViewProps {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Patient, User } from '../../types.ts';
+import { Patient } from '../../types.ts';
 import { Button } from '../../components/common/Button.tsx';
 import { Input } from '../../components/common/Input.tsx';
 import { SecuritySettingsView } from '../common/SecuritySettingsView.tsx';

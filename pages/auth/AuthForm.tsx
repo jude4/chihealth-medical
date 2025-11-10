@@ -17,7 +17,7 @@ interface AuthFormProps {
 
 type AuthView = 'login' | 'register';
 
-export const AuthForm: React.FC<AuthFormProps> = ({ onSsoSuccess, onForgotPassword, onAuthSuccess, initialTab = 'login' }) => {
+export const AuthForm: React.FC<AuthFormProps> = ({ onSsoSuccess: _onSsoSuccess, onForgotPassword, onAuthSuccess, initialTab = 'login' }) => {
     const [view, setView] = useState<AuthView>(initialTab);
     const [isSsoLoading, setIsSsoLoading] = useState(false);
     const [formHeight, setFormHeight] = useState<number | undefined>(undefined);
@@ -70,11 +70,20 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSsoSuccess, onForgotPasswo
                 };
 
                 // Candidate probe URLs (order matters): proxied path first, then configured backend, then origin
+                const normalizedApiBase = api.API_BASE_URL.replace(/\/$/, '');
+                const originBase = window.location.origin.replace(/\/$/, '');
+                const localLoopbacks = ['localhost', '127.0.0.1', '::1'];
+                const loopbackCandidates: string[] = [];
+                if (localLoopbacks.includes(window.location.hostname)) {
+                    loopbackCandidates.push('http://localhost:8080/api/health', 'http://127.0.0.1:8080/api/health');
+                }
+
                 const candidates = [
                     '/api/health',
-                    `${api.API_BASE_URL.replace(/\/$/, '')}/api/health`,
-                    `${window.location.origin}/api/health`,
-                ];
+                    `${normalizedApiBase}/api/health`,
+                    `${originBase}/api/health`,
+                    ...loopbackCandidates
+                ].filter((value, index, self) => self.indexOf(value) === index);
 
                 try {
                     try { console.debug('Health probe candidates:', candidates); } catch (e) {}

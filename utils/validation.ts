@@ -24,14 +24,9 @@ export const checkPasswordStrength = (password: string): PasswordStrengthResult 
   if (hasNumber) score++;
   if (hasSymbol) score++;
 
-  if (!isLongEnough) {
-     score = Math.min(score, 1);
+  if (!isLongEnough && score > 0) {
+    score = Math.max(score - 1, 0);
   }
-  // Cap score if not all base criteria are met
-  if (!hasLowerCase || !hasUpperCase || !hasNumber || !hasSymbol || !isLongEnough) {
-      score = Math.min(score, 2);
-  }
-
 
   return {
     score: score as PasswordStrengthResult['score'],

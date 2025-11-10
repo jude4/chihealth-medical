@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Organization, User } from '../../types.ts';
 import * as api from '../../services/apiService.ts';
 import { Button } from '../../components/common/Button.tsx';
@@ -19,7 +19,7 @@ export const OrganizationManagementView: React.FC<OrganizationManagementViewProp
   const [orgToLink, setOrgToLink] = useState<Organization | null>(null);
   const { addToast } = useToasts();
 
-  const handleCreate = async (orgData: Omit<Organization, 'id' | 'planId'>) => {
+  const handleCreate = async (_orgData: Omit<Organization, 'id' | 'planId'>) => {
     // This functionality is now on the backend
     addToast("Functionality not implemented in mock.", 'info');
     setCreateModalOpen(false);

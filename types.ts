@@ -28,6 +28,9 @@ export interface Patient extends User {
   dateOfBirth: string;
   lastVisit: string;
   wearableData?: WearableDataPoint[];
+  // Added fields used across UI and backend helpers
+  vitalHistory?: any[];
+  wearableDevices?: any[];
 }
 
 export interface WearableDataPoint {

@@ -9,7 +9,7 @@ interface SecuritySettingsViewProps {
   user: User;
 }
 
-export const SecuritySettingsView: React.FC<SecuritySettingsViewProps> = ({ user }) => {
+export const SecuritySettingsView: React.FC<SecuritySettingsViewProps> = ({ user: _user }) => {
     const [isMfaModalOpen, setIsMfaModalOpen] = useState(false);
     const { addToast } = useToasts();
 
